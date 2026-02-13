@@ -1,36 +1,38 @@
 import streamlit as st
 
 st.set_page_config(
-    page_title="Sistema Integrado REDEC 10",
-    layout="wide",
-    initial_sidebar_state="expanded"
+    page_title="Sistema Integrado REDEC 10 - Norte",
+    page_icon="🏛️",
+    layout="wide"
 )
 
-# SIDEBAR
-st.sidebar.image("assets/logo.png", use_column_width=True)
+# ===== SIDEBAR =====
+st.sidebar.title("REDEC 10 - Norte")
 
 menu = st.sidebar.radio(
     "Menu",
     [
         "🏠 Dashboard",
-        "🌊 Rios",
-        "🚨 Ocorrências",
-        "📥 SEI",
-        "📰 Boletins",
         "👥 Equipe",
-        "🚗 Viaturas",
-        "📦 Patrimônio",
-        "🧃 Contêiner",
-        "🗓 Agenda",
-        "🏛 COMDECs",
         "⚙️ Configurações"
     ]
 )
 
-st.title(menu)
+# ===== HEADER =====
+st.title("Sistema Integrado REDEC 10 - Norte")
+st.caption("Defesa Civil - Governo do Estado")
 
-if menu == "👥 Equipe":
-    from pages.equipe import tela_equipe
-    tela_equipe()
-else:
-    st.info("Módulo em desenvolvimento")
+st.divider()
+
+# ===== CONTEÚDO =====
+if menu == "🏠 Dashboard":
+    st.subheader("Painel Geral")
+    st.info("Dashboard em construção")
+
+elif menu == "👥 Equipe":
+    st.subheader("Gestão da Equipe REDEC 10")
+    st.info("Módulo Equipe em construção")
+
+elif menu == "⚙️ Configurações":
+    st.subheader("Configurações do Sistema")
+    st.info("Em breve")
