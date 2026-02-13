@@ -4,9 +4,9 @@ from datetime import date
 from services.supabase import supabase
 
 
-# ===============================
-# BUSCAR HISTÓRICO COMPLETO
-# ===============================
+FUNCOES_UNICAS = ["Coordenador", "Subcoordenador"]
+
+
 def buscar_historico():
     return supabase.table("historico_redec") \
         .select("*, equipe(nome)") \
@@ -14,16 +14,10 @@ def buscar_historico():
         .execute().data
 
 
-# ===============================
-# INSERIR NOVO REGISTRO
-# ===============================
 def inserir_historico(dados):
     return supabase.table("historico_redec").insert(dados).execute()
 
 
-# ===============================
-# ENCERRAR FUNÇÃO ATUAL
-# ===============================
 def encerrar_funcao(funcao):
     hoje = date.today().isoformat()
 
@@ -34,14 +28,12 @@ def encerrar_funcao(funcao):
         .execute()
 
 
-# ===============================
-# TROCAR FUNÇÃO (SUBSTITUIÇÃO)
-# ===============================
 def trocar_funcao(equipe_id, funcao, data_entrada):
-    # Fecha quem estava antes
-    encerrar_funcao(funcao)
 
-    # Insere novo ocupante
+    # Apenas cargos únicos encerram o anterior
+    if funcao in FUNCOES_UNICAS:
+        encerrar_funcao(funcao)
+
     inserir_historico({
         "equipe_id": equipe_id,
         "funcao": funcao,
