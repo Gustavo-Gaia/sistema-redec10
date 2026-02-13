@@ -56,24 +56,24 @@ def painel_equipe(aba):
         df = pd.DataFrame(historico)
         df = df[df["data_saida"].isna()]
 
-        df["nome"] = df["equipe"].apply(lambda x: x.get("nome","") if isinstance(x, dict) else "")
-        df["posto"] = df["equipe"].apply(lambda x: x.get("posto_graduacao","") if isinstance(x, dict) else "")
+        df["nome"] = df["equipe"].apply(lambda x: x.get("nome", "") if isinstance(x, dict) else "")
+        df["posto"] = df["equipe"].apply(lambda x: x.get("posto_graduacao", "") if isinstance(x, dict) else "")
 
-        # Hierarquia militar oficial
+        # Hierarquia militar oficial (PADRÃO BM)
         hierarquia = {
-            "CEL": 1,
-            "TEN CEL": 2,
-            "MAJ": 3,
-            "CAP": 4,
-            "1º TEN": 5,
-            "2º TEN": 6,
-            "ASPIRANTE": 7,
-            "SUBTEN": 8,
-            "1º SGT": 9,
-            "2º SGT": 10,
-            "3º SGT": 11,
-            "CB": 12,
-            "SD": 13
+            "CEL BM": 1,
+            "TEN CEL BM": 2,
+            "MAJ BM": 3,
+            "CAP BM": 4,
+            "1º TEN BM": 5,
+            "2º TEN BM": 6,
+            "ASPIRANTE BM": 7,
+            "SUBTEN BM": 8,
+            "1º SGT BM": 9,
+            "2º SGT BM": 10,
+            "3º SGT BM": 11,
+            "CB BM": 12,
+            "SD BM": 13
         }
 
         cargos = {
@@ -90,12 +90,11 @@ def painel_equipe(aba):
             if sub.empty:
                 continue
 
-            sub["peso"] = sub["posto"].str.upper().map(hierarquia).fillna(99)
-
+            sub["peso"] = sub["posto"].map(hierarquia).fillna(99)
             sub = sub.sort_values("peso")
 
             lista = [
-                f'{p.upper()} BM {n}'
+                f"{p} {n}".upper()
                 for p, n in zip(sub["posto"], sub["nome"])
             ]
 
@@ -141,8 +140,12 @@ def painel_equipe(aba):
         dfh = dfh[["Servidor", "funcao", "data_entrada", "data_saida"]]
         dfh.columns = ["Servidor", "Função", "Entrada", "Saída"]
 
-        st.dataframe(dfh.sort_values("Entrada", ascending=False),
-                     use_container_width=True, hide_index=True)
+        st.dataframe(
+            dfh.sort_values("Entrada", ascending=False),
+            use_container_width=True,
+            hide_index=True
+        )
+
 
 
 # ============================================================
