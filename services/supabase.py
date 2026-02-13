@@ -1,4 +1,4 @@
-# supabase_client.py
+# services/supabase.py
 
 from supabase import create_client
 import streamlit as st
