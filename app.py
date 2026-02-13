@@ -65,7 +65,23 @@ elif menu == "👥 Equipe":
             salvar = st.form_submit_button("Salvar")
 
         if salvar:
-            st.success("Formulário enviado (em breve salvaremos no banco)")
+            from services.supabase import inserir_membro
+        
+            dados = {
+                "nome": nome,
+                "nome_guerra": nome_guerra,
+                "rg": rg,
+                "id_funcional": id_funcional,
+                "posto_graduacao": posto,
+                "quadro_qbmp": quadro,
+                "telefone": telefone
+            }
+        
+            inserir_membro(dados)
+        
+            st.success("Membro cadastrado com sucesso!")
+            st.experimental_rerun()
+
 
 
 elif menu == "⚙️ Configurações":
