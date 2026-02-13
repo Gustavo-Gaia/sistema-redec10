@@ -14,3 +14,10 @@ def buscar_equipe():
 
 def inserir_membro(dados):
     return supabase.table("equipe").insert(dados).execute()
+
+def atualizar_membro(id, dados):
+    return supabase.table("equipe").update(dados).eq("id", id).execute()
+
+def excluir_membro(id):
+    return supabase.table("equipe").delete().eq("id", id).execute()
+
