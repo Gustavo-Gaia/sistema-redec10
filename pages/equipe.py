@@ -1,7 +1,16 @@
 # pages/equipe.py
 
 import streamlit as st
+import pandas as pd
 from services.supabase import buscar_equipe, inserir_membro
+from services.ferias import (
+    buscar_ferias,
+    inserir_ferias
+)
+from services.historico import (
+    buscar_historico,
+    inserir_historico
+)
 
 def tela_equipe():
 
@@ -21,7 +30,11 @@ def tela_equipe():
         if not dados:
             st.warning("Nenhum membro cadastrado.")
         else:
-            st.dataframe(dados, use_container_width=True)
+            df = pd.DataFrame(dados)
+
+            st.metric("Total de Membros", len(df))
+
+            st.dataframe(df, use_container_width=True)
 
     # =================== CADASTRO ===================
     with aba2:
@@ -56,9 +69,64 @@ def tela_equipe():
 
     # =================== FERIAS ===================
     with aba3:
-        st.info("Controle de férias e licenças — vamos montar no próximo passo")
+        st.markdown("### Controle de Férias / Licenças")
 
-    # =================== RELATÓRIOS ===================
+        membros = buscar_equipe()
+
+        if not membros:
+            st.warning("Cadastre membros antes.")
+        else:
+            nomes = {m["nome"]: m["id"] for m in membros}
+
+            with st.form("form_ferias"):
+                pessoa = st.selectbox("Servidor", nomes.keys())
+                tipo = st.selectbox("Tipo", ["Férias", "Licença Médica", "Licença Prêmio", "Outros"])
+                inicio = st.date_input("Data de início")
+                fim = st.date_input("Data final")
+                obs = st.text_area("Observação")
+
+                salvar = st.form_submit_button("Registrar")
+
+            if salvar:
+                dados = {
+                    "equipe_id": nomes[pessoa],
+                    "tipo": tipo,
+                    "inicio": str(inicio),
+                    "fim": str(fim),
+                    "observacao": obs
+                }
+
+                inserir_ferias(dados)
+
+                st.success("Registro salvo com sucesso!")
+                st.rerun()
+
+        ferias = buscar_ferias()
+
+        if ferias:
+            st.dataframe(pd.DataFrame(ferias), use_container_width=True)
+
+    # =================== RELATORIOS ===================
     with aba4:
-        st.info("Relatórios automáticos — vamos montar no próximo passo")
+        st.markdown("### Relatórios da Equipe")
 
+        dados = buscar_equipe()
+
+        if not dados:
+            st.warning("Sem dados.")
+        else:
+            df = pd.DataFrame(dados)
+
+            ativos = df[df["ativo"] == True]
+            inativos = df[df["ativo"] == False]
+
+            col1, col2, col3 = st.columns(3)
+
+            col1.metric("Total", len(df))
+            col2.metric("Ativos", len(ativos))
+            col3.metric("Inativos", len(inativos))
+
+            st.divider()
+
+            st.subheader("Lista de Ativos")
+            st.dataframe(ativos, use_container_width=True)
