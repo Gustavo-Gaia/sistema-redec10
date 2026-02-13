@@ -122,60 +122,60 @@ def tela_equipe():
             else:
                 st.info("Nenhum membro cadastrado.")
 
-        # ============================================================
+    # ============================================================
     # 3️⃣ SUBSTITUIÇÕES
     # ============================================================
     with aba3:
         st.markdown("### 🔁 Controle de Substituições Funcionais")
-
+    
         from services.historico import trocar_funcao
-
+    
         equipe = buscar_equipe()
-
-        if not equipe:
-            st.warning("Cadastre membros antes.")
-            return
-
-        nomes = {m["nome"]: m["id"] for m in equipe}
-
-        funcao = st.selectbox("Função", [
-            "Coordenador",
-            "Subcoordenador",
-            "Oficial Administrativo",
-            "Praça Administrativo"
-        ])
-
-        pessoa = st.selectbox("Novo ocupante", nomes.keys())
-        data = st.date_input("Data de início")
-
-        if st.button("🔁 Registrar Substituição"):
-            trocar_funcao(nomes[pessoa], funcao, data)
-
-            st.success(f"{funcao} atualizado com sucesso!")
-            st.rerun()
-
-    # ============================================================
-    # 3️⃣ FÉRIAS / LICENÇAS
-    # ============================================================
-    with aba3:
-        st.markdown("### 🏖 Controle de Férias e Licenças")
-
-        equipe = buscar_equipe()
-
+    
         if not equipe:
             st.warning("Cadastre membros antes.")
         else:
-            nomes = {f"{m['nome']}": m["id"] for m in equipe}
+            nomes = {m["nome"]: m["id"] for m in equipe}
+    
+            funcao = st.selectbox("Função", [
+                "Coordenador",
+                "Subcoordenador",
+                "Oficial Administrativo",
+                "Praça Administrativo"
+            ])
+    
+            pessoa = st.selectbox("Novo ocupante", nomes.keys())
+            data = st.date_input("Data de início")
+    
+            if st.button("🔁 Registrar Substituição"):
+                trocar_funcao(nomes[pessoa], funcao, data)
+    
+                st.success(f"{funcao} atualizado com sucesso!")
+                st.rerun()
 
+
+    # ============================================================
+    # 4️⃣ FÉRIAS / LICENÇAS
+    # ============================================================
+    with aba4:
+        st.markdown("### 🏖 Controle de Férias e Licenças")
+    
+        equipe = buscar_equipe()
+    
+        if not equipe:
+            st.warning("Cadastre membros antes.")
+        else:
+            nomes = {m["nome"]: m["id"] for m in equipe}
+    
             with st.form("form_ferias"):
                 pessoa = st.selectbox("Servidor", nomes.keys())
                 tipo = st.selectbox("Tipo", ["Férias", "Licença Médica", "Licença Prêmio", "Outros"])
                 inicio = st.date_input("Data de início")
                 fim = st.date_input("Data final")
                 obs = st.text_area("Observação")
-
+    
                 salvar = st.form_submit_button("Registrar")
-
+    
             if salvar:
                 inserir_ferias({
                     "equipe_id": nomes[pessoa],
@@ -184,43 +184,47 @@ def tela_equipe():
                     "fim": str(fim),
                     "observacao": obs
                 })
-
+    
                 st.success("Registro salvo!")
                 st.rerun()
-
+    
         registros = buscar_ferias()
         if registros:
             st.dataframe(pd.DataFrame(registros), use_container_width=True)
 
-    # ============================================================
-    # 4️⃣ RELATÓRIOS
-    # ============================================================
-    with aba4:
-        st.markdown("### 📊 Relatórios Gerenciais")
 
+    # ============================================================
+    # 5️⃣ RELATÓRIOS
+    # ============================================================
+    with aba5:
+        st.markdown("### 📊 Relatórios Gerenciais")
+    
         equipe = buscar_equipe()
         historico = buscar_historico()
-
+    
         if equipe:
             df = pd.DataFrame(equipe)
-
+    
             ativos = df[df["ativo"] == True]
             inativos = df[df["ativo"] == False]
-
+    
             col1, col2, col3 = st.columns(3)
-
+    
             col1.metric("Total", len(df))
             col2.metric("Ativos", len(ativos))
             col3.metric("Inativos", len(inativos))
-
+    
             st.divider()
             st.subheader("Equipe Ativa")
             st.dataframe(ativos, use_container_width=True)
-
+    
         if historico:
             st.divider()
             st.subheader("Histórico de Coordenadores")
+    
             dfh = pd.DataFrame(historico)
             coord = dfh[dfh["funcao"] == "Coordenador"]
+    
             st.dataframe(coord, use_container_width=True)
+
 
