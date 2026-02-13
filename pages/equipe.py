@@ -14,12 +14,14 @@ def tela_equipe():
 
     st.subheader("👥 Gestão da Equipe - REDEC 10")
 
-    aba1, aba2, aba3, aba4 = st.tabs([
-        "🧭 Painel da Equipe",
-        "➕ Cadastro & Gestão",
-        "🏖 Férias / Licenças",
-        "📊 Relatórios"
+    aba1, aba2, aba3, aba4, aba5 = st.tabs([
+            "🧭 Painel da Equipe",
+            "➕ Cadastro & Gestão",
+            "🔁 Substituições",
+            "🏖 Férias / Licenças",
+            "📊 Relatórios"
     ])
+
 
     # ============================================================
     # 1️⃣ PAINEL DA EQUIPE ATUAL
@@ -119,6 +121,38 @@ def tela_equipe():
                 st.dataframe(df, use_container_width=True)
             else:
                 st.info("Nenhum membro cadastrado.")
+
+        # ============================================================
+    # 3️⃣ SUBSTITUIÇÕES
+    # ============================================================
+    with aba3:
+        st.markdown("### 🔁 Controle de Substituições Funcionais")
+
+        from services.historico import trocar_funcao
+
+        equipe = buscar_equipe()
+
+        if not equipe:
+            st.warning("Cadastre membros antes.")
+            return
+
+        nomes = {m["nome"]: m["id"] for m in equipe}
+
+        funcao = st.selectbox("Função", [
+            "Coordenador",
+            "Subcoordenador",
+            "Oficial Administrativo",
+            "Praça Administrativo"
+        ])
+
+        pessoa = st.selectbox("Novo ocupante", nomes.keys())
+        data = st.date_input("Data de início")
+
+        if st.button("🔁 Registrar Substituição"):
+            trocar_funcao(nomes[pessoa], funcao, data)
+
+            st.success(f"{funcao} atualizado com sucesso!")
+            st.rerun()
 
     # ============================================================
     # 3️⃣ FÉRIAS / LICENÇAS
