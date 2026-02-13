@@ -34,8 +34,16 @@ if menu == "🏠 Dashboard":
     st.info("Dashboard em construção")
 
 elif menu == "👥 Equipe":
-    st.subheader("Gestão da Equipe REDEC 10")
-    st.info("Módulo Equipe em construção")
+    from services.supabase import buscar_equipe
+
+    st.subheader("👥 Gestão da Equipe - REDEC 10")
+
+    dados = buscar_equipe()
+
+    if not dados:
+        st.warning("Nenhum membro cadastrado.")
+    else:
+        st.dataframe(dados, use_container_width=True)
 
 elif menu == "⚙️ Configurações":
     st.subheader("Configurações do Sistema")
