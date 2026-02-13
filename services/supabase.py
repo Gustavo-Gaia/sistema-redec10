@@ -11,3 +11,6 @@ supabase = create_client(url, key)
 def buscar_equipe():
     response = supabase.table("equipe").select("*").order("nome").execute()
     return response.data
+
+def inserir_membro(dados):
+    return supabase.table("equipe").insert(dados).execute()
