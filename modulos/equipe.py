@@ -2,6 +2,7 @@
 
 import streamlit as st
 import pandas as pd
+import re
 
 from services.supabase import (
     buscar_equipe,
@@ -61,9 +62,14 @@ def painel_equipe(aba):
 
         # =================== NORMALIZAÇÃO DO POSTO ===================
         def normalizar_posto(p):
-            return str(p).upper().replace("  ", " ").strip()
+            p = str(p).upper()
+            p = p.replace("\u00a0", " ")   # remove espaço invisível
+            p = re.sub(r"\s+", " ", p)     # remove espaços duplicados
+            return p.strip()
 
         df["posto"] = df["posto_raw"].apply(normalizar_posto)
+        df["nome"] = df["nome"].astype(str).str.strip().str.upper()
+
 
         # =================== HIERARQUIA MILITAR ===================
         hierarquia = {
@@ -96,7 +102,7 @@ def painel_equipe(aba):
             if sub.empty:
                 continue
 
-            sub["peso"] = sub["posto"].map(hierarquia).fillna(99)
+            sub["peso"] = sub["posto"].apply(lambda x: hierarquia.get(x, 99))
             sub = sub.sort_values("peso")
 
             lista = [
