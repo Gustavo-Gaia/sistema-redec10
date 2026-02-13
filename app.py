@@ -30,12 +30,7 @@ MENU_ITENS = [
     "⚙️ Configurações"
 ]
 
-menu = st.sidebar.radio(
-    "Menu",
-    MENU_ITENS,
-    index=MENU_ITENS.index(st.session_state["menu"])
-)
-
+menu = st.sidebar.radio("Menu", MENU_ITENS, index=MENU_ITENS.index(st.session_state["menu"]))
 st.session_state["menu"] = menu
 
 # ================== HEADER ================== #
@@ -52,21 +47,23 @@ st.markdown("""
 
 # ================== FUNÇÃO CARD ================== #
 def card(titulo, valor, icone, cor, destino):
-    st.markdown(f"""
-    <div style="background:{cor};
-                padding:18px;
-                border-radius:14px;
-                color:white;
-                box-shadow:0 4px 10px rgba(0,0,0,.15);
-                text-align:center;">
-        <h4>{icone} {titulo}</h4>
-        <h2>{valor}</h2>
-    </div>
-    """, unsafe_allow_html=True)
+    col = st.container()
+    with col:
+        st.markdown(f"""
+        <div style="background:{cor};
+                    padding:18px;
+                    border-radius:14px;
+                    color:white;
+                    box-shadow:0 4px 10px rgba(0,0,0,.15);
+                    text-align:center;">
+            <h4>{icone} {titulo}</h4>
+            <h2>{valor}</h2>
+        </div>
+        """, unsafe_allow_html=True)
 
-    if st.button(f"Abrir {titulo}", key=destino):
-        st.session_state["menu"] = destino
-        st.rerun()
+        if st.button(f"Abrir {titulo}", key=destino):
+            st.session_state["menu"] = destino
+            st.rerun()
 
 # ================== DASHBOARD ================== #
 if menu == "🏠 Dashboard":
@@ -106,38 +103,6 @@ elif menu == "👥 Equipe REDEC 10":
     from modulos.equipe import tela_equipe
     tela_equipe()
 
-elif menu == "📄 Boletins":
-    st.subheader("📄 Boletins")
+else:
+    st.subheader(menu)
     st.info("Módulo em desenvolvimento")
-
-elif menu == "📥 SEI":
-    st.subheader("📥 SEI")
-    st.info("Módulo em desenvolvimento")
-
-elif menu == "📅 Agenda de Atividades":
-    st.subheader("📅 Agenda de Atividades")
-    st.info("Módulo em desenvolvimento")
-
-elif menu == "🌊 Monitoramento de Rios":
-    st.subheader("🌊 Monitoramento de Rios")
-    st.info("Módulo em desenvolvimento")
-
-elif menu == "📦 Contêiner Humanitário":
-    st.subheader("📦 Contêiner Humanitário")
-    st.info("Módulo em desenvolvimento")
-
-elif menu == "🚑 Controle de Viaturas":
-    st.subheader("🚑 Controle de Viaturas")
-    st.info("Módulo em desenvolvimento")
-
-elif menu == "🏛 Municípios COMDECs":
-    st.subheader("🏛 Municípios COMDECs")
-    st.info("Módulo em desenvolvimento")
-
-elif menu == "🏗 Bens Patrimoniais":
-    st.subheader("🏗 Bens Patrimoniais")
-    st.info("Módulo em desenvolvimento")
-
-elif menu == "⚙️ Configurações":
-    st.subheader("⚙️ Configurações")
-    st.info("Em desenvolvimento")
