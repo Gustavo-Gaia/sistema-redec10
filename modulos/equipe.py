@@ -1,4 +1,4 @@
-# pages/equipe.py
+# modulos/equipe.py
 
 import streamlit as st
 import pandas as pd
@@ -22,7 +22,7 @@ def tela_equipe():
 
     st.subheader("👥 Gestão da Equipe - REDEC 10")
 
-    aba1, aba2, aba3, aba4, aba5 = st.tabs([
+    abas = st.tabs([
         "🧭 Painel da Equipe",
         "➕ Cadastro & Gestão",
         "🔁 Funções & Substituições",
@@ -30,11 +30,20 @@ def tela_equipe():
         "📊 Relatórios"
     ])
 
-    # ============================================================
-    # PAINEL DA EQUIPE
-    # ============================================================
-    with aba1:
+    painel_equipe(abas[0])
+    cadastro_gestao(abas[1])
+    funcoes_substituicoes(abas[2])
+    ferias_licencas(abas[3])
+    relatorios(abas[4])
 
+
+# ============================================================
+# PAINEL
+# ============================================================
+
+def painel_equipe(aba):
+
+    with aba:
         st.markdown("### 🧭 Composição Atual da REDEC 10")
 
         historico = buscar_historico()
@@ -44,9 +53,11 @@ def tela_equipe():
             return
 
         df = pd.DataFrame(historico)
-
         df = df[df["data_saida"].isna()]
-        df["nome"] = df["equipe"].apply(lambda x: x.get("nome") if isinstance(x, dict) else "")
+
+        df["nome"] = df["equipe"].apply(
+            lambda x: x.get("nome") if isinstance(x, dict) else ""
+        )
 
         cargos = {
             "Coordenador": [],
@@ -56,11 +67,12 @@ def tela_equipe():
         }
 
         for _, row in df.iterrows():
-            cargos[row["funcao"]].append(row["nome"])
+            if row["funcao"] in cargos:
+                cargos[row["funcao"]].append(row["nome"])
 
         col1, col2, col3, col4 = st.columns(4)
 
-        def render_card(titulo, nomes):
+        def card(titulo, nomes):
             nomes = "<br>".join(nomes) if nomes else "Vago"
             st.markdown(f"""
             <div style="background:#1f4c81;
@@ -75,30 +87,39 @@ def tela_equipe():
             """, unsafe_allow_html=True)
 
         with col1:
-            render_card("Coordenador", cargos["Coordenador"])
+            card("Coordenador", cargos["Coordenador"])
         with col2:
-            render_card("Subcoordenador", cargos["Subcoordenador"])
+            card("Subcoordenador", cargos["Subcoordenador"])
         with col3:
-            render_card("Oficial Administrativo", cargos["Oficial Administrativo"])
+            card("Oficial Administrativo", cargos["Oficial Administrativo"])
         with col4:
-            render_card("Praça Administrativo", cargos["Praça Administrativo"])
+            card("Praça Administrativo", cargos["Praça Administrativo"])
 
         st.divider()
         st.subheader("📜 Histórico Funcional")
 
         dfh = pd.DataFrame(historico)
-        dfh["Servidor"] = dfh["equipe"].apply(lambda x: x.get("nome") if isinstance(x, dict) else "")
+        dfh["Servidor"] = dfh["equipe"].apply(
+            lambda x: x.get("nome") if isinstance(x, dict) else ""
+        )
 
         dfh = dfh[["Servidor", "funcao", "data_entrada", "data_saida"]]
         dfh.columns = ["Servidor", "Função", "Entrada", "Saída"]
 
-        st.dataframe(dfh.sort_values("Entrada", ascending=False),
-                     use_container_width=True, hide_index=True)
+        st.dataframe(
+            dfh.sort_values("Entrada", ascending=False),
+            use_container_width=True,
+            hide_index=True
+        )
 
-    # ============================================================
-    # CADASTRO & GESTÃO
-    # ============================================================
-    with aba2:
+
+# ============================================================
+# CADASTRO
+# ============================================================
+
+def cadastro_gestao(aba):
+
+    with aba:
 
         st.markdown("### 👤 Cadastro de Novo Servidor")
 
@@ -113,7 +134,7 @@ def tela_equipe():
 
             salvar = st.form_submit_button("Cadastrar")
 
-        if salvar:
+        if salvar and nome:
             inserir_membro({
                 "nome": nome,
                 "nome_guerra": nome_guerra,
@@ -134,51 +155,56 @@ def tela_equipe():
 
         if not equipe:
             st.info("Nenhum servidor cadastrado.")
-        else:
-            df = pd.DataFrame(equipe)
+            return
 
-            df_view = df[["id", "nome", "posto_graduacao", "quadro_qbmp", "telefone"]]
-            df_view.columns = ["ID", "Nome", "Posto", "Quadro", "Telefone"]
+        df = pd.DataFrame(equipe)
 
-            st.dataframe(df_view, hide_index=True, use_container_width=True)
+        df_view = df[["id", "nome", "posto_graduacao", "quadro_qbmp", "telefone"]]
+        df_view.columns = ["ID", "Nome", "Posto", "Quadro", "Telefone"]
 
-            st.divider()
-            st.markdown("### ✏️ Editar / Excluir")
+        st.dataframe(df_view, hide_index=True, use_container_width=True)
 
-            selecionado = st.selectbox("Selecionar servidor", df["nome"])
+        st.divider()
+        st.markdown("### ✏️ Editar / Excluir")
 
-            registro = df[df["nome"] == selecionado].iloc[0]
+        selecionado = st.selectbox("Selecionar servidor", df["nome"].tolist())
 
-            col1, col2 = st.columns(2)
+        registro = df[df["nome"] == selecionado].iloc[0]
 
-            with col1:
-                nome_edit = st.text_input("Nome", registro["nome"])
-                posto_edit = st.text_input("Posto", registro["posto_graduacao"])
-                quadro_edit = st.text_input("Quadro", registro["quadro_qbmp"])
-                tel_edit = st.text_input("Telefone", registro["telefone"])
+        col1, col2 = st.columns(2)
 
-                if st.button("Atualizar dados"):
-                    atualizar_membro(registro["id"], {
-                        "nome": nome_edit,
-                        "posto_graduacao": posto_edit,
-                        "quadro_qbmp": quadro_edit,
-                        "telefone": tel_edit
-                    })
-                    st.success("Dados atualizados!")
-                    st.rerun()
+        with col1:
+            nome_edit = st.text_input("Nome", registro["nome"])
+            posto_edit = st.text_input("Posto", registro["posto_graduacao"])
+            quadro_edit = st.text_input("Quadro", registro["quadro_qbmp"])
+            tel_edit = st.text_input("Telefone", registro["telefone"])
 
-            with col2:
-                st.warning("⚠️ Exclusão permanente")
+            if st.button("Atualizar dados"):
+                atualizar_membro(registro["id"], {
+                    "nome": nome_edit,
+                    "posto_graduacao": posto_edit,
+                    "quadro_qbmp": quadro_edit,
+                    "telefone": tel_edit
+                })
+                st.success("Dados atualizados!")
+                st.rerun()
 
-                if st.button("Excluir servidor"):
-                    excluir_membro(registro["id"])
-                    st.success("Servidor excluído!")
-                    st.rerun()
+        with col2:
+            st.warning("⚠️ Exclusão permanente")
 
-    # ============================================================
-    # FUNÇÕES & SUBSTITUIÇÕES
-    # ============================================================
-    with aba3:
+            if st.button("Excluir servidor"):
+                excluir_membro(registro["id"])
+                st.success("Servidor excluído!")
+                st.rerun()
+
+
+# ============================================================
+# FUNÇÕES
+# ============================================================
+
+def funcoes_substituicoes(aba):
+
+    with aba:
 
         st.markdown("### 🔁 Registro de Funções")
 
@@ -186,30 +212,35 @@ def tela_equipe():
 
         if not equipe:
             st.warning("Cadastre servidores primeiro.")
-        else:
-            nomes = {m["nome"]: m["id"] for m in equipe}
+            return
 
-            funcao = st.selectbox("Função", [
-                "Coordenador",
-                "Subcoordenador",
-                "Oficial Administrativo",
-                "Praça Administrativo"
-            ])
+        nomes = {m["nome"]: m["id"] for m in equipe}
 
-            pessoa = st.selectbox("Servidor", nomes.keys())
-            data = st.date_input("Data de início")
+        funcao = st.selectbox("Função", [
+            "Coordenador",
+            "Subcoordenador",
+            "Oficial Administrativo",
+            "Praça Administrativo"
+        ])
 
-            st.info("Coordenador e Subcoordenador possuem apenas 1 vaga. As demais permitem múltiplos ocupantes.")
+        pessoa = st.selectbox("Servidor", list(nomes.keys()))
+        data = st.date_input("Data de início")
 
-            if st.button("Registrar Função"):
-                trocar_funcao(nomes[pessoa], funcao, data)
-                st.success("Função registrada com sucesso!")
-                st.rerun()
+        st.info("Coordenador e Subcoordenador possuem apenas 1 vaga. As demais permitem múltiplos ocupantes.")
 
-    # ============================================================
-    # FÉRIAS / LICENÇAS
-    # ============================================================
-    with aba4:
+        if st.button("Registrar Função"):
+            trocar_funcao(nomes[pessoa], funcao, data)
+            st.success("Função registrada com sucesso!")
+            st.rerun()
+
+
+# ============================================================
+# FÉRIAS
+# ============================================================
+
+def ferias_licencas(aba):
+
+    with aba:
 
         st.markdown("### 🏖 Controle de Férias / Licenças")
 
@@ -217,45 +248,53 @@ def tela_equipe():
 
         if not equipe:
             st.warning("Cadastre servidores primeiro.")
-        else:
-            nomes = {m["nome"]: m["id"] for m in equipe}
+            return
 
-            with st.form("form_ferias"):
-                pessoa = st.selectbox("Servidor", nomes.keys())
-                tipo = st.selectbox("Tipo", ["Férias", "Licença Médica", "Licença Prêmio", "Outros"])
-                inicio = st.date_input("Data início")
-                fim = st.date_input("Data fim")
-                obs = st.text_area("Observação")
+        nomes = {m["nome"]: m["id"] for m in equipe}
 
-                salvar = st.form_submit_button("Registrar")
+        with st.form("form_ferias"):
+            pessoa = st.selectbox("Servidor", list(nomes.keys()))
+            tipo = st.selectbox("Tipo", ["Férias", "Licença Médica", "Licença Prêmio", "Outros"])
+            inicio = st.date_input("Data início")
+            fim = st.date_input("Data fim")
+            obs = st.text_area("Observação")
 
-            if salvar:
-                inserir_ferias({
-                    "equipe_id": nomes[pessoa],
-                    "tipo": tipo,
-                    "inicio": str(inicio),
-                    "fim": str(fim),
-                    "observacao": obs
-                })
-                st.success("Registro salvo!")
-                st.rerun()
+            salvar = st.form_submit_button("Registrar")
 
-            registros = buscar_ferias()
+        if salvar:
+            inserir_ferias({
+                "equipe_id": nomes[pessoa],
+                "tipo": tipo,
+                "inicio": str(inicio),
+                "fim": str(fim),
+                "observacao": obs
+            })
+            st.success("Registro salvo!")
+            st.rerun()
 
-            if registros:
-                df_f = pd.DataFrame(registros)
-                df_f.columns = ["ID", "Servidor", "Tipo", "Início", "Fim", "Obs"]
-                st.dataframe(df_f, use_container_width=True, hide_index=True)
+        registros = buscar_ferias()
 
-    # ============================================================
-    # RELATÓRIOS
-    # ============================================================
-    with aba5:
+        if registros:
+            df = pd.DataFrame(registros)
+            st.dataframe(df, use_container_width=True, hide_index=True)
+
+
+# ============================================================
+# RELATÓRIOS
+# ============================================================
+
+def relatorios(aba):
+
+    with aba:
 
         st.markdown("### 📊 Relatórios Gerenciais")
 
         equipe = buscar_equipe()
         historico = buscar_historico()
+
+        if not equipe:
+            st.info("Nenhum dado disponível.")
+            return
 
         df = pd.DataFrame(equipe)
 
@@ -267,20 +306,22 @@ def tela_equipe():
         col2.metric("Ativos", len(ativos))
         col3.metric("Inativos", len(inativos))
 
-        st.divider()
+        if historico:
+            st.divider()
+            st.subheader("📜 Histórico de Coordenadores")
 
-        st.subheader("📜 Histórico de Coordenadores")
+            dfh = pd.DataFrame(historico)
+            dfh["Servidor"] = dfh["equipe"].apply(
+                lambda x: x.get("nome") if isinstance(x, dict) else ""
+            )
 
-        dfh = pd.DataFrame(historico)
-        dfh["Servidor"] = dfh["equipe"].apply(lambda x: x.get("nome") if isinstance(x, dict) else "")
+            coord = dfh[dfh["funcao"] == "Coordenador"]
+            coord = coord[["Servidor", "data_entrada", "data_saida"]]
+            coord.columns = ["Servidor", "Entrada", "Saída"]
 
-        coord = dfh[dfh["funcao"] == "Coordenador"]
-
-        coord = coord[["Servidor", "data_entrada", "data_saida"]]
-        coord.columns = ["Servidor", "Entrada", "Saída"]
-
-        st.dataframe(coord.sort_values("Entrada", ascending=False),
-                     use_container_width=True, hide_index=True)
-
-
+            st.dataframe(
+                coord.sort_values("Entrada", ascending=False),
+                use_container_width=True,
+                hide_index=True
+            )
 
