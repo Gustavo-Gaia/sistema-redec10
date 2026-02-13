@@ -15,10 +15,8 @@ from services.ferias import buscar_ferias, inserir_ferias
 from services.historico import buscar_historico, trocar_funcao
 
 # ============================================================
-# CONFIGURAÇÕES E CONSTANTES
+# CONFIGURAÇÕES E CONSTANTES - HIERARQUIA MILITAR
 # ============================================================
-
-# Dicionário global para garantir ordenação e padronização
 HIERARQUIA_MILITAR = {
     "CEL BM": 1,
     "TEN CEL BM": 2,
@@ -71,21 +69,33 @@ def painel_equipe(aba):
             st.info("Nenhuma função registrada.")
             return
 
-        # Filtragem de ocupantes atuais
+        # Converter para DataFrame e filtrar apenas ocupantes atuais
         df = pd.DataFrame(historico)
         df = df[df["data_saida"].isna()].copy()
 
-        # Extração e Limpeza de dados
-        df["nome"] = df["equipe"].apply(lambda x: x.get("nome", "").strip().upper() if isinstance(x, dict) else "")
-        df["posto_raw"] = df["equipe"].apply(lambda x: x.get("posto_graduacao", "").strip().upper() if isinstance(x, dict) else "")
+        # Função interna para limpar e extrair dados do JSON do Supabase
+        def extrair_dados(row):
+            eq = row.get("equipe", {})
+            if not isinstance(eq, dict):
+                return "", ""
+            
+            nome = str(eq.get("nome", "")).strip().upper()
+            posto = str(eq.get("posto_graduacao", "")).strip().upper()
+            return nome, posto
 
-        def normalizar_posto(p):
-            p = re.sub(r"\s+", " ", str(p)) # Remove espaços duplos ou invisíveis
-            return p.strip()
+        # Aplicar extração
+        df[["nome_completo", "posto_graduacao"]] = df.apply(
+            lambda x: pd.Series(extrair_dados(x)), axis=1
+        )
 
-        df["posto_limpo"] = df["posto_raw"].apply(normalizar_posto)
+        # Normalização do Posto para ordenação (remove caracteres especiais de espaço)
+        def limpar_texto(t):
+            t = t.replace("\u00a0", " ")
+            return re.sub(r"\s+", " ", t).strip()
 
-        # Preparação dos cargos para os cards
+        df["posto_limpo"] = df["posto_graduacao"].apply(limpar_texto)
+
+        # Dicionário para armazenar quem vai em cada card
         cargos_cards = {
             "Coordenador": [],
             "Subcoordenador": [],
@@ -99,21 +109,22 @@ def painel_equipe(aba):
             if sub.empty:
                 continue
 
-            # Aplica o peso da hierarquia para ordenação
+            # Criar coluna de peso para ordenação
             sub["peso"] = sub["posto_limpo"].apply(lambda x: HIERARQUIA_MILITAR.get(x, 99))
             
-            # Ordena por Hierarquia (peso) e depois por Nome (alfabético)
-            sub = sub.sort_values(by=["peso", "nome"])
+            # Ordenar por Hierarquia (peso) e depois por Nome
+            sub = sub.sort_values(by=["peso", "nome_completo"])
 
-            # Gera a lista final de strings "Posto Nome"
-            lista_formatada = [
-                f"{row['posto_raw']} {row['nome']}".strip() 
-                for _, row in sub.iterrows()
-            ]
+            # AQUI ESTÁ A CORREÇÃO: Montar a string "POSTO NOME" explicitamente
+            lista_final = []
+            for _, row in sub.iterrows():
+                # Garante que o posto apareça antes do nome
+                texto_membro = f"{row['posto_graduacao']} {row['nome_completo']}".strip()
+                lista_final.append(texto_membro)
 
-            cargos_cards[funcao] = lista_formatada
+            cargos_cards[funcao] = lista_final
 
-        # Interface de Cards
+        # Renderização dos Cards
         col1, col2, col3, col4 = st.columns(4)
 
         def card(titulo, nomes):
@@ -130,10 +141,10 @@ def painel_equipe(aba):
                 display:flex;
                 flex-direction:column;
                 justify-content:center;">
-                <div style="font-size:11px; opacity:.8; margin-bottom:8px; font-weight:bold;">
+                <div style="font-size:11px; opacity:.8; margin-bottom:8px; font-weight:bold; letter-spacing:1px;">
                     {titulo.upper()}
                 </div>
-                <div style="font-size:14px; font-weight:600; line-height:1.4;">
+                <div style="font-size:13px; font-weight:600; line-height:1.4;">
                     {conteudo}
                 </div>
             </div>
@@ -148,15 +159,11 @@ def painel_equipe(aba):
         st.subheader("📜 Histórico Funcional")
         
         dfh = pd.DataFrame(historico)
-        dfh["Servidor"] = dfh["equipe"].apply(lambda x: x.get("nome") if isinstance(x, dict) else "")
-        dfh = dfh[["Servidor", "funcao", "data_entrada", "data_saida"]]
-        dfh.columns = ["Servidor", "Função", "Entrada", "Saída"]
-
-        st.dataframe(
-            dfh.sort_values("Entrada", ascending=False),
-            use_container_width=True,
-            hide_index=True
-        )
+        if not dfh.empty:
+            dfh["Servidor"] = dfh["equipe"].apply(lambda x: f"{x.get('posto_graduacao')} {x.get('nome')}" if isinstance(x, dict) else "")
+            dfh = dfh[["Servidor", "funcao", "data_entrada", "data_saida"]]
+            dfh.columns = ["Servidor (Posto + Nome)", "Função", "Início", "Término"]
+            st.dataframe(dfh.sort_values("Início", ascending=False), use_container_width=True, hide_index=True)
 
 
 # ============================================================
@@ -172,14 +179,11 @@ def cadastro_gestao(aba):
             nome_guerra = st.text_input("Nome de guerra")
             rg = st.text_input("RG")
             id_funcional = st.text_input("ID Funcional")
-            
-            # Selectbox para evitar erros de digitação na hierarquia
             posto = st.selectbox("Posto / Graduação", list(HIERARQUIA_MILITAR.keys()))
-            
-            quadro = st.text_input("Quadro / QBMP", value="QBMP/0")
+            quadro = st.text_input("Quadro / QBMP", value="Q00/00")
             telefone = st.text_input("Telefone")
 
-            salvar = st.form_submit_button("Cadastrar")
+            salvar = st.form_submit_button("Cadastrar Servidor")
 
         if salvar and nome:
             inserir_membro({
@@ -196,52 +200,46 @@ def cadastro_gestao(aba):
             st.rerun()
 
         st.divider()
-        st.markdown("### 📋 Gestão da Equipe")
-
+        st.markdown("### 📋 Listagem Geral")
         equipe = buscar_equipe()
-        if not equipe:
-            st.info("Nenhum servidor cadastrado.")
-            return
-
-        df_equipe = pd.DataFrame(equipe)
-        st.dataframe(df_equipe[["id","nome","posto_graduacao","quadro_qbmp","telefone"]],
-                     use_container_width=True, hide_index=True)
-
-        st.divider()
-        st.markdown("### ✏️ Editar / Excluir")
-
-        selecionado = st.selectbox("Selecionar servidor para editar", df_equipe["nome"].tolist())
-        registro = df_equipe[df_equipe["nome"] == selecionado].iloc[0]
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-            nome_edit = st.text_input("Nome", registro["nome"])
+        if equipe:
+            df_lista = pd.DataFrame(equipe)
+            # Ordenar a lista geral também por hierarquia para facilitar a busca
+            df_lista["peso"] = df_lista["posto_graduacao"].apply(lambda x: HIERARQUIA_MILITAR.get(x, 99))
+            df_lista = df_lista.sort_values(by=["peso", "nome"])
             
-            # Busca índice do posto atual para o selectbox
-            idx_posto = list(HIERARQUIA_MILITAR.keys()).index(registro["posto_graduacao"]) if registro["posto_graduacao"] in HIERARQUIA_MILITAR else 0
-            posto_edit = st.selectbox("Posto", list(HIERARQUIA_MILITAR.keys()), index=idx_posto)
-            
-            quadro_edit = st.text_input("Quadro", registro["quadro_qbmp"])
-            tel_edit = st.text_input("Telefone", registro["telefone"])
+            st.dataframe(df_lista[["id", "posto_graduacao", "nome", "quadro_qbmp", "telefone"]], 
+                         use_container_width=True, hide_index=True)
 
-            if st.button("Atualizar dados"):
-                atualizar_membro(registro["id"], {
-                    "nome": nome_edit.upper(),
-                    "posto_graduacao": posto_edit,
-                    "quadro_qbmp": quadro_edit.upper(),
-                    "telefone": tel_edit
-                })
-                st.success("Dados atualizados!")
-                st.rerun()
+            st.divider()
+            st.markdown("### ✏️ Editar / Excluir")
+            selecionado = st.selectbox("Selecione para editar", df_lista["nome"].tolist())
+            registro = df_lista[df_lista["nome"] == selecionado].iloc[0]
 
-        with col2:
-            st.warning("⚠️ Exclusão permanente")
-            if st.button("Excluir servidor"):
-                excluir_membro(registro["id"])
-                st.success("Servidor excluído!")
-                st.rerun()
+            with st.expander(f"Editar dados de {registro['nome']}"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    nome_edit = st.text_input("Nome", registro["nome"])
+                    idx_p = list(HIERARQUIA_MILITAR.keys()).index(registro["posto_graduacao"]) if registro["posto_graduacao"] in HIERARQUIA_MILITAR else 0
+                    posto_edit = st.selectbox("Posto", list(HIERARQUIA_MILITAR.keys()), index=idx_p, key="ed_posto")
+                with col2:
+                    quadro_edit = st.text_input("Quadro", registro["quadro_qbmp"])
+                    tel_edit = st.text_input("Telefone", registro["telefone"])
 
+                c1, c2 = st.columns(2)
+                if c1.button("Salvar Alterações", use_container_width=True):
+                    atualizar_membro(registro["id"], {
+                        "nome": nome_edit.upper(),
+                        "posto_graduacao": posto_edit,
+                        "quadro_qbmp": quadro_edit.upper(),
+                        "telefone": tel_edit
+                    })
+                    st.success("Atualizado!")
+                    st.rerun()
+                
+                if c2.button("Excluir Definitivamente", use_container_width=True, type="secondary"):
+                    excluir_membro(registro["id"])
+                    st.rerun()
 
 # ============================================================
 # 3. FUNÇÕES & SUBSTITUIÇÕES
