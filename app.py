@@ -80,7 +80,8 @@ elif menu == "👥 Equipe":
             inserir_membro(dados)
         
             st.success("Membro cadastrado com sucesso!")
-            st.experimental_rerun()
+            st.rerun()
+
 
 
 
