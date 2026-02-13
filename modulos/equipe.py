@@ -57,9 +57,15 @@ def painel_equipe(aba):
         df = df[df["data_saida"].isna()]
 
         df["nome"] = df["equipe"].apply(lambda x: x.get("nome", "") if isinstance(x, dict) else "")
-        df["posto"] = df["equipe"].apply(lambda x: x.get("posto_graduacao", "") if isinstance(x, dict) else "")
+        df["posto_raw"] = df["equipe"].apply(lambda x: x.get("posto_graduacao", "") if isinstance(x, dict) else "")
 
-        # Hierarquia militar oficial (PADRÃO BM)
+        # =================== NORMALIZAÇÃO DO POSTO ===================
+        def normalizar_posto(p):
+            return str(p).upper().replace("  ", " ").strip()
+
+        df["posto"] = df["posto_raw"].apply(normalizar_posto)
+
+        # =================== HIERARQUIA MILITAR ===================
         hierarquia = {
             "CEL BM": 1,
             "TEN CEL BM": 2,
@@ -94,7 +100,7 @@ def painel_equipe(aba):
             sub = sub.sort_values("peso")
 
             lista = [
-                f"{p} {n}".upper()
+                f"{p} {n}".strip()
                 for p, n in zip(sub["posto"], sub["nome"])
             ]
 
