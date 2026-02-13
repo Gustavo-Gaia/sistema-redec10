@@ -103,7 +103,7 @@ if menu == "🏠 Dashboard":
 
 # ================== PÁGINAS ================== #
 elif menu == "👥 Equipe REDEC 10":
-    from pages.equipe import tela_equipe
+    from modulos.equipe import tela_equipe
     tela_equipe()
 
 elif menu == "📄 Boletins":
