@@ -28,41 +28,45 @@ def tela_equipe():
     # ============================================================
     with aba1:
         st.markdown("### 🧭 Composição Atual da REDEC 10")
-
+    
         historico = buscar_historico()
         equipe = buscar_equipe()
-
+    
         if not historico:
-            st.warning("Nenhum histórico funcional cadastrado.")
-            return
-
-        df = pd.DataFrame(historico)
-        df = df[df["data_saida"].isna()]
-
-        cargos = [
-            "Coordenador",
-            "Subcoordenador",
-            "Oficial Administrativo",
-            "Praça Administrativo"
-        ]
-
-        cols = st.columns(4)
-
-        for i, cargo in enumerate(cargos):
-            atual = df[df["funcao"] == cargo]
-
-            with cols[i]:
-                st.markdown(f"""
-                <div style="background:#1f4c81;padding:15px;border-radius:12px;color:white;text-align:center;">
-                    <h5>{cargo}</h5>
-                    <h4>{atual.iloc[0]['funcao'] if not atual.empty else 'Vago'}</h4>
-                </div>
-                """, unsafe_allow_html=True)
-
+            st.info("Nenhuma função ocupada atualmente.")
+        else:
+            df = pd.DataFrame(historico)
+            df = df[df["data_saida"].isna()]
+    
+            cargos = [
+                "Coordenador",
+                "Subcoordenador",
+                "Oficial Administrativo",
+                "Praça Administrativo"
+            ]
+    
+            cols = st.columns(4)
+    
+            for i, cargo in enumerate(cargos):
+                atual = df[df["funcao"] == cargo]
+    
+                with cols[i]:
+                    st.markdown(f"""
+                    <div style="background:#1f4c81;padding:15px;border-radius:12px;color:white;text-align:center;">
+                        <h5>{cargo}</h5>
+                        <h4>{atual.iloc[0]['funcao'] if not atual.empty else 'Vago'}</h4>
+                    </div>
+                    """, unsafe_allow_html=True)
+    
         st.divider()
-
+    
         st.subheader("Histórico Funcional")
-        st.dataframe(df, use_container_width=True)
+    
+        if historico:
+            st.dataframe(pd.DataFrame(historico), use_container_width=True)
+        else:
+            st.info("Nenhum registro no histórico ainda.")
+
 
     # ============================================================
     # 2️⃣ CADASTRO & GESTÃO
