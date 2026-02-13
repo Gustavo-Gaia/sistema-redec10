@@ -38,12 +38,35 @@ elif menu == "👥 Equipe":
 
     st.subheader("👥 Gestão da Equipe - REDEC 10")
 
-    dados = buscar_equipe()
+    tab1, tab2 = st.tabs(["📋 Lista", "➕ Novo Cadastro"])
 
-    if not dados:
-        st.warning("Nenhum membro cadastrado.")
-    else:
-        st.dataframe(dados, use_container_width=True)
+    # ===== LISTA =====
+    with tab1:
+        dados = buscar_equipe()
+
+        if not dados:
+            st.warning("Nenhum membro cadastrado.")
+        else:
+            st.dataframe(dados, use_container_width=True)
+
+    # ===== CADASTRO =====
+    with tab2:
+        st.subheader("Novo Membro")
+
+        with st.form("form_novo_membro"):
+            nome = st.text_input("Nome completo")
+            nome_guerra = st.text_input("Nome de guerra")
+            rg = st.text_input("RG")
+            id_funcional = st.text_input("ID Funcional")
+            posto = st.text_input("Posto / Graduação")
+            quadro = st.text_input("Quadro / QBMP")
+            telefone = st.text_input("Telefone")
+
+            salvar = st.form_submit_button("Salvar")
+
+        if salvar:
+            st.success("Formulário enviado (em breve salvaremos no banco)")
+
 
 elif menu == "⚙️ Configurações":
     st.subheader("Configurações do Sistema")
