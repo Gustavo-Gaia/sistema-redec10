@@ -56,17 +56,24 @@ def painel_equipe(aba):
         df = pd.DataFrame(historico)
         df = df[df["data_saida"].isna()]
 
-        df["nome"] = df["equipe"].apply(lambda x: x.get("nome") if isinstance(x, dict) else "")
+        df["nome"] = df["equipe"].apply(lambda x: x.get("nome","") if isinstance(x, dict) else "")
         df["posto"] = df["equipe"].apply(lambda x: x.get("posto_graduacao","") if isinstance(x, dict) else "")
 
+        # Hierarquia militar oficial
         hierarquia = {
-            "SUBTEN": 1,
-            "1º SGT": 2,
-            "2º SGT": 3,
-            "3º SGT": 4,
-            "SGT": 4,
-            "CB": 5,
-            "SD": 6
+            "CEL": 1,
+            "TEN CEL": 2,
+            "MAJ": 3,
+            "CAP": 4,
+            "1º TEN": 5,
+            "2º TEN": 6,
+            "ASPIRANTE": 7,
+            "SUBTEN": 8,
+            "1º SGT": 9,
+            "2º SGT": 10,
+            "3º SGT": 11,
+            "CB": 12,
+            "SD": 13
         }
 
         cargos = {
@@ -76,21 +83,23 @@ def painel_equipe(aba):
             "Praça Administrativo": []
         }
 
-        lista_pracas = []
+        for funcao in cargos.keys():
 
-        for _, row in df.iterrows():
-            funcao = row["funcao"]
+            sub = df[df["funcao"] == funcao].copy()
 
-            if funcao == "Praça Administrativo":
-                posto = str(row["posto"]).upper()
-                peso = hierarquia.get(posto, 99)
-                lista_pracas.append((peso, f'{posto} {row["nome"]}'))
+            if sub.empty:
+                continue
 
-            elif funcao in cargos:
-                cargos[funcao].append(row["nome"])
+            sub["peso"] = sub["posto"].str.upper().map(hierarquia).fillna(99)
 
-        lista_pracas.sort(key=lambda x: x[0])
-        cargos["Praça Administrativo"] = [nome for _, nome in lista_pracas]
+            sub = sub.sort_values("peso")
+
+            lista = [
+                f'{p.upper()} BM {n}'
+                for p, n in zip(sub["posto"], sub["nome"])
+            ]
+
+            cargos[funcao] = lista
 
         col1, col2, col3, col4 = st.columns(4)
 
@@ -99,19 +108,19 @@ def painel_equipe(aba):
             st.markdown(f"""
             <div style="
                 background: linear-gradient(135deg, #163c66, #1f5aa6);
-                padding:16px;
-                border-radius:12px;
+                padding:18px;
+                border-radius:14px;
                 color:white;
                 text-align:center;
-                min-height:110px;
-                box-shadow:0 4px 10px rgba(0,0,0,.15);
+                min-height:130px;
+                box-shadow:0 6px 12px rgba(0,0,0,.18);
                 display:flex;
                 flex-direction:column;
                 justify-content:center;">
-                <div style="font-size:13px; opacity:.85; margin-bottom:6px;">
+                <div style="font-size:12px; opacity:.8; margin-bottom:8px;">
                     {titulo.upper()}
                 </div>
-                <div style="font-size:15px; font-weight:600; line-height:1.5;">
+                <div style="font-size:15px; font-weight:600; line-height:1.55;">
                     {conteudo}
                 </div>
             </div>
@@ -123,6 +132,7 @@ def painel_equipe(aba):
         with col4: card("Praça Administrativo", cargos["Praça Administrativo"])
 
         st.divider()
+
         st.subheader("📜 Histórico Funcional")
 
         dfh = pd.DataFrame(historico)
