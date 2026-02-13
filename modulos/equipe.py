@@ -38,26 +38,36 @@ def tela_equipe():
 
 
 # ============================================================
-# PAINEL
+# PAINEL PRINCIPAL
 # ============================================================
 
 def painel_equipe(aba):
 
     with aba:
+
         st.markdown("### 🧭 Composição Atual da REDEC 10")
 
         historico = buscar_historico()
 
         if not historico:
-            st.info("Nenhuma função cadastrada ainda.")
+            st.info("Nenhuma função registrada.")
             return
 
         df = pd.DataFrame(historico)
         df = df[df["data_saida"].isna()]
 
-        df["nome"] = df["equipe"].apply(
-            lambda x: x.get("nome") if isinstance(x, dict) else ""
-        )
+        df["nome"] = df["equipe"].apply(lambda x: x.get("nome") if isinstance(x, dict) else "")
+        df["posto"] = df["equipe"].apply(lambda x: x.get("posto_graduacao","") if isinstance(x, dict) else "")
+
+        hierarquia = {
+            "SUBTEN": 1,
+            "1º SGT": 2,
+            "2º SGT": 3,
+            "3º SGT": 4,
+            "SGT": 4,
+            "CB": 5,
+            "SD": 6
+        }
 
         cargos = {
             "Coordenador": [],
@@ -66,55 +76,67 @@ def painel_equipe(aba):
             "Praça Administrativo": []
         }
 
+        lista_pracas = []
+
         for _, row in df.iterrows():
-            if row["funcao"] in cargos:
-                cargos[row["funcao"]].append(row["nome"])
+            funcao = row["funcao"]
+
+            if funcao == "Praça Administrativo":
+                posto = str(row["posto"]).upper()
+                peso = hierarquia.get(posto, 99)
+                lista_pracas.append((peso, f'{posto} {row["nome"]}'))
+
+            elif funcao in cargos:
+                cargos[funcao].append(row["nome"])
+
+        lista_pracas.sort(key=lambda x: x[0])
+        cargos["Praça Administrativo"] = [nome for _, nome in lista_pracas]
 
         col1, col2, col3, col4 = st.columns(4)
 
         def card(titulo, nomes):
-            nomes = "<br>".join(nomes) if nomes else "Vago"
+            conteudo = "<br>".join(nomes) if nomes else "<span style='opacity:0.6'>Vago</span>"
             st.markdown(f"""
-            <div style="background:#1f4c81;
-                        padding:18px;
-                        border-radius:14px;
-                        color:white;
-                        text-align:center;
-                        min-height:120px">
-                <h5>{titulo}</h5>
-                <h4>{nomes}</h4>
+            <div style="
+                background: linear-gradient(135deg, #163c66, #1f5aa6);
+                padding:16px;
+                border-radius:12px;
+                color:white;
+                text-align:center;
+                min-height:110px;
+                box-shadow:0 4px 10px rgba(0,0,0,.15);
+                display:flex;
+                flex-direction:column;
+                justify-content:center;">
+                <div style="font-size:13px; opacity:.85; margin-bottom:6px;">
+                    {titulo.upper()}
+                </div>
+                <div style="font-size:15px; font-weight:600; line-height:1.5;">
+                    {conteudo}
+                </div>
             </div>
             """, unsafe_allow_html=True)
 
-        with col1:
-            card("Coordenador", cargos["Coordenador"])
-        with col2:
-            card("Subcoordenador", cargos["Subcoordenador"])
-        with col3:
-            card("Oficial Administrativo", cargos["Oficial Administrativo"])
-        with col4:
-            card("Praça Administrativo", cargos["Praça Administrativo"])
+        with col1: card("Coordenador", cargos["Coordenador"])
+        with col2: card("Subcoordenador", cargos["Subcoordenador"])
+        with col3: card("Oficial Administrativo", cargos["Oficial Administrativo"])
+        with col4: card("Praça Administrativo", cargos["Praça Administrativo"])
 
         st.divider()
         st.subheader("📜 Histórico Funcional")
 
         dfh = pd.DataFrame(historico)
-        dfh["Servidor"] = dfh["equipe"].apply(
-            lambda x: x.get("nome") if isinstance(x, dict) else ""
-        )
+        dfh["Servidor"] = dfh["equipe"].apply(lambda x: x.get("nome") if isinstance(x, dict) else "")
 
         dfh = dfh[["Servidor", "funcao", "data_entrada", "data_saida"]]
         dfh.columns = ["Servidor", "Função", "Entrada", "Saída"]
 
-        st.dataframe(
-            dfh.sort_values("Entrada", ascending=False),
-            use_container_width=True,
-            hide_index=True
-        )
+        st.dataframe(dfh.sort_values("Entrada", ascending=False),
+                     use_container_width=True, hide_index=True)
 
 
 # ============================================================
-# CADASTRO
+# CADASTRO & GESTÃO
 # ============================================================
 
 def cadastro_gestao(aba):
@@ -140,7 +162,7 @@ def cadastro_gestao(aba):
                 "nome_guerra": nome_guerra,
                 "rg": rg,
                 "id_funcional": id_funcional,
-                "posto_graduacao": posto,
+                "posto_graduacao": posto.upper(),
                 "quadro_qbmp": quadro,
                 "telefone": telefone,
                 "ativo": True
@@ -152,23 +174,19 @@ def cadastro_gestao(aba):
         st.markdown("### 📋 Gestão da Equipe")
 
         equipe = buscar_equipe()
-
         if not equipe:
             st.info("Nenhum servidor cadastrado.")
             return
 
         df = pd.DataFrame(equipe)
 
-        df_view = df[["id", "nome", "posto_graduacao", "quadro_qbmp", "telefone"]]
-        df_view.columns = ["ID", "Nome", "Posto", "Quadro", "Telefone"]
-
-        st.dataframe(df_view, hide_index=True, use_container_width=True)
+        st.dataframe(df[["id","nome","posto_graduacao","quadro_qbmp","telefone"]],
+                     use_container_width=True, hide_index=True)
 
         st.divider()
         st.markdown("### ✏️ Editar / Excluir")
 
         selecionado = st.selectbox("Selecionar servidor", df["nome"].tolist())
-
         registro = df[df["nome"] == selecionado].iloc[0]
 
         col1, col2 = st.columns(2)
@@ -182,7 +200,7 @@ def cadastro_gestao(aba):
             if st.button("Atualizar dados"):
                 atualizar_membro(registro["id"], {
                     "nome": nome_edit,
-                    "posto_graduacao": posto_edit,
+                    "posto_graduacao": posto_edit.upper(),
                     "quadro_qbmp": quadro_edit,
                     "telefone": tel_edit
                 })
@@ -199,7 +217,7 @@ def cadastro_gestao(aba):
 
 
 # ============================================================
-# FUNÇÕES
+# FUNÇÕES & SUBSTITUIÇÕES
 # ============================================================
 
 def funcoes_substituicoes(aba):
@@ -209,7 +227,6 @@ def funcoes_substituicoes(aba):
         st.markdown("### 🔁 Registro de Funções")
 
         equipe = buscar_equipe()
-
         if not equipe:
             st.warning("Cadastre servidores primeiro.")
             return
@@ -235,7 +252,7 @@ def funcoes_substituicoes(aba):
 
 
 # ============================================================
-# FÉRIAS
+# FÉRIAS / LICENÇAS
 # ============================================================
 
 def ferias_licencas(aba):
@@ -245,7 +262,6 @@ def ferias_licencas(aba):
         st.markdown("### 🏖 Controle de Férias / Licenças")
 
         equipe = buscar_equipe()
-
         if not equipe:
             st.warning("Cadastre servidores primeiro.")
             return
@@ -273,10 +289,9 @@ def ferias_licencas(aba):
             st.rerun()
 
         registros = buscar_ferias()
-
         if registros:
-            df = pd.DataFrame(registros)
-            st.dataframe(df, use_container_width=True, hide_index=True)
+            st.dataframe(pd.DataFrame(registros),
+                         use_container_width=True, hide_index=True)
 
 
 # ============================================================
@@ -311,17 +326,13 @@ def relatorios(aba):
             st.subheader("📜 Histórico de Coordenadores")
 
             dfh = pd.DataFrame(historico)
-            dfh["Servidor"] = dfh["equipe"].apply(
-                lambda x: x.get("nome") if isinstance(x, dict) else ""
-            )
+            dfh["Servidor"] = dfh["equipe"].apply(lambda x: x.get("nome") if isinstance(x, dict) else "")
 
             coord = dfh[dfh["funcao"] == "Coordenador"]
             coord = coord[["Servidor", "data_entrada", "data_saida"]]
             coord.columns = ["Servidor", "Entrada", "Saída"]
 
-            st.dataframe(
-                coord.sort_values("Entrada", ascending=False),
-                use_container_width=True,
-                hide_index=True
-            )
+            st.dataframe(coord.sort_values("Entrada", ascending=False),
+                         use_container_width=True, hide_index=True)
+
 
