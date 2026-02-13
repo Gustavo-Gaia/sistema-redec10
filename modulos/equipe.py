@@ -27,33 +27,59 @@ def tela_equipe():
     # ============================================================
     with aba1:
         st.markdown("### 🧭 Composição Atual da REDEC 10")
-
+    
         historico = buscar_historico()
-
+    
         if not historico:
             st.warning("Nenhuma função cadastrada ainda.")
             return
-
+    
         df = pd.DataFrame(historico)
+    
+        # Somente funções ativas
         df = df[df["data_saida"].isna()]
-
-        cargos_unicos = ["Coordenador", "Subcoordenador"]
-        cargos_multiplos = ["Oficial Administrativo", "Praça Administrativo"]
-
+    
+        # Extrair nome corretamente
+        df["nome"] = df["equipe"].apply(lambda x: x.get("nome") if isinstance(x, dict) else "")
+    
+        cargos = {
+            "Coordenador": [],
+            "Subcoordenador": [],
+            "Oficial Administrativo": [],
+            "Praça Administrativo": []
+        }
+    
+        for _, row in df.iterrows():
+            cargos[row["funcao"]].append(row["nome"])
+    
         col1, col2, col3, col4 = st.columns(4)
+    
+        def render_card(titulo, nomes):
+            nomes = "<br>".join(nomes) if nomes else "Vago"
+            st.markdown(f"""
+            <div style="background:#1f4c81;
+                        padding:18px;
+                        border-radius:14px;
+                        color:white;
+                        text-align:center;
+                        min-height:120px">
+                <h5>{titulo}</h5>
+                <h4>{nomes}</h4>
+            </div>
+            """, unsafe_allow_html=True)
+    
+        with col1:
+            render_card("Coordenador", cargos["Coordenador"])
+    
+        with col2:
+            render_card("Subcoordenador", cargos["Subcoordenador"])
+    
+        with col3:
+            render_card("Oficial Administrativo", cargos["Oficial Administrativo"])
+    
+        with col4:
+            render_card("Praça Administrativo", cargos["Praça Administrativo"])
 
-        for i, cargo in enumerate(cargos_unicos + cargos_multiplos):
-            ocupantes = df[df["funcao"] == cargo]
-
-            nomes = ", ".join(ocupantes["equipe"]["nome"]) if not ocupantes.empty else "Vago"
-
-            with [col1, col2, col3, col4][i]:
-                st.markdown(f"""
-                <div style="background:#1f4c81;padding:18px;border-radius:14px;color:white;text-align:center;">
-                    <h5>{cargo}</h5>
-                    <h4>{nomes}</h4>
-                </div>
-                """, unsafe_allow_html=True)
 
     # ============================================================
     # CADASTRO
