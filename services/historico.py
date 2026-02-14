@@ -3,13 +3,12 @@
 from datetime import date
 from services.supabase import supabase
 
-# Constantes para lógica de negócio
-FUNCOES_UNICAS = ["Coordenador", "Subcoordenador"]
+# Apenas o Coordenador exige a lógica de encerrar o anterior na mesma data
+# O Subcoordenador agora segue o fluxo normal, conforme sua solicitação
+FUNCAO_COM_SUCESSAO_ESTRITA = "Coordenador"
 
 def buscar_historico():
-    """
-    Busca todo o histórico de funções, incluindo dados relacionados do militar.
-    """
+    """Busca todo o histórico de funções com os dados do militar vinculado."""
     return supabase.table("historico_redec") \
         .select("*, equipe(nome, posto_graduacao)") \
         .order("data_entrada", desc=True) \
@@ -19,14 +18,11 @@ def inserir_historico(dados):
     """Insere um novo registro de função no histórico."""
     return supabase.table("historico_redec").insert(dados).execute()
 
-def encerrar_funcao(funcao, data_saida):
+def encerrar_mandato_anterior(funcao, data_saida):
     """
-    Define a data de saída para o ocupante atual de uma função específica.
-    Agora recebe 'data_saida' como parâmetro para garantir a continuidade 
-    com o sucessor.
+    Localiza o ocupante atual (data_saida nula) da função e define sua saída.
+    A data de saída será exatamente a data de entrada do novo sucessor.
     """
-    # Usamos o filtro 'is.null' para garantir que estamos encerrando apenas 
-    # o registro que ainda está aberto (ativo)
     return supabase.table("historico_redec") \
         .update({"data_saida": str(data_saida)}) \
         .eq("funcao", funcao) \
@@ -35,16 +31,15 @@ def encerrar_funcao(funcao, data_saida):
 
 def trocar_funcao(equipe_id, funcao, data_entrada):
     """
-    Lógica principal para troca de cargos. 
-    Garante que cargos únicos tenham sucessão linear de datas.
+    Lógica de troca de função. 
+    Se for Coordenador, encerra o anterior automaticamente para não haver vacância.
     """
-    # 1. Se a função for única (Coordenador/Sub), encerra o anterior 
-    # na exata data em que o novo está entrando.
-    if funcao in FUNCOES_UNICAS:
-        encerrar_funcao(funcao, data_entrada)
+    # Lógica de continuidade automática apenas para o Coordenador
+    if funcao == FUNCAO_COM_SUCESSAO_ESTRITA:
+        encerrar_mandato_anterior(funcao, data_entrada)
 
-    # 2. Insere o novo ocupante. 
-    # Explicitamos 'data_saida': None para garantir que o registro entre aberto.
+    # Inserção do novo registro
+    # Forçamos data_saida como None para garantir que ele seja o atual "Ativo"
     return inserir_historico({
         "equipe_id": equipe_id,
         "funcao": funcao,
