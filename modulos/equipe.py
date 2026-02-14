@@ -64,13 +64,19 @@ def painel_equipe(aba):
         historico_data = buscar_historico()
 
         if not historico_data:
-            st.info("Nenhuma função registrada.")
+            st.info("Nenhuma função registrada no histórico.")
             return
 
+        # 1. Preparação dos Dados
         df_raw = pd.DataFrame(historico_data)
         
-        # FILTRO ROBUSTO: data_saida deve ser nulo ou vazio para ser considerado ATUAL
-        df_atual = df_raw[df_raw["data_saida"].apply(lambda x: x is None or str(x).lower() == 'none' or str(x).strip() == '')].copy()
+        # Converter datas para garantir ordenação correta
+        df_raw["data_entrada"] = pd.to_datetime(df_raw["data_entrada"])
+        
+        # FILTRO DE ATIVOS: data_saida nula ou vazia
+        df_atual = df_raw[df_raw["data_saida"].apply(
+            lambda x: x is None or str(x).lower() == 'none' or str(x).strip() == ''
+        )].copy()
 
         def extrair_campo(row, campo):
             eq = row.get("equipe", {})
@@ -78,14 +84,7 @@ def painel_equipe(aba):
                 return str(eq.get(campo, "")).strip().upper()
             return ""
 
-        df_atual["nome_c"] = df_atual.apply(lambda x: extrair_campo(x, "nome"), axis=1)
-        df_atual["posto_c"] = df_atual.apply(lambda x: extrair_campo(x, "posto_graduacao"), axis=1)
-
-        def normalize(t):
-            return re.sub(r"\s+", " ", str(t).replace("\u00a0", " ")).strip()
-
-        df_atual["posto_ord"] = df_atual["posto_c"].apply(normalize)
-
+        # 2. Processamento para os Cards
         cargos_cards = {
             "Coordenador": [],
             "Subcoordenador": [],
@@ -93,18 +92,32 @@ def painel_equipe(aba):
             "Praça Administrativo": []
         }
 
-        for funcao in cargos_cards.keys():
-            sub = df_atual[df_atual["funcao"] == funcao].copy()
+        for cargo in cargos_cards.keys():
+            sub = df_atual[df_atual["funcao"] == cargo].copy()
 
             if not sub.empty:
-                sub["peso"] = sub["posto_ord"].apply(lambda x: HIERARQUIA_MILITAR.get(x, 99))
+                # LÓGICA ESPECIAL PARA COORDENADOR: 
+                # Se houver mais de um "ativo" por erro de sistema, prioriza o que entrou por último
+                if cargo == "Coordenador":
+                    sub = sub.sort_values(by="data_entrada", ascending=False).head(1)
+                
+                # Normalização e Hierarquia
+                sub["posto_c"] = sub.apply(lambda x: extrair_campo(x, "posto_graduacao"), axis=1)
+                sub["nome_c"] = sub.apply(lambda x: extrair_campo(x, "nome"), axis=1)
+                
+                sub["posto_norm"] = sub["posto_c"].apply(
+                    lambda t: re.sub(r"\s+", " ", str(t).replace("\u00a0", " ")).strip()
+                )
+                
+                sub["peso"] = sub["posto_norm"].apply(lambda x: HIERARQUIA_MILITAR.get(x, 99))
                 sub = sub.sort_values(by=["peso", "nome_c"])
 
-                cargos_cards[funcao] = [
+                cargos_cards[cargo] = [
                     f"{row['posto_c']} {row['nome_c']}".strip() 
                     for _, row in sub.iterrows()
                 ]
 
+        # 3. Renderização Visual (Cards)
         col1, col2, col3, col4 = st.columns(4)
 
         def card(titulo, nomes):
@@ -129,16 +142,32 @@ def painel_equipe(aba):
         with col4: card("Praça Administrativo", cargos_cards["Praça Administrativo"])
 
         st.divider()
-        st.subheader("📜 Histórico Funcional")
+
+        # 4. Tabela de Histórico (Geral)
+        st.subheader("📜 Histórico de Ocupação e Trocas")
         if not df_raw.empty:
-             df_raw["Militar"] = df_raw["equipe"].apply(lambda x: f"{x.get('posto_graduacao', '')} {x.get('nome', '')}".strip() if isinstance(x, dict) else "Desconhecido")
-             df_hist_view = df_raw[["Militar", "funcao", "data_entrada", "data_saida"]].copy()
-             
-             # Melhorando visualização do histórico
-             df_hist_view["data_saida"] = df_hist_view["data_saida"].fillna("Ativo")
-             df_hist_view.columns = ["Servidor (Posto + Nome)", "Função", "Início", "Término"]
-             
-             st.dataframe(df_hist_view.sort_values("Início", ascending=False), use_container_width=True, hide_index=True)
+            df_hist = df_raw.copy()
+            
+            # Extração de nomes para a listagem
+            df_hist["Militar"] = df_hist["equipe"].apply(
+                lambda x: f"{x.get('posto_graduacao', '')} {x.get('nome', '')}".strip() if isinstance(x, dict) else "Militar Excluído"
+            )
+            
+            # Formatação para exibição
+            df_view = df_hist[["Militar", "funcao", "data_entrada", "data_saida"]].copy()
+            df_view["data_entrada"] = df_view["data_entrada"].dt.strftime('%d/%m/%Y')
+            df_view["data_saida"] = df_view["data_saida"].apply(
+                lambda x: pd.to_datetime(x).strftime('%d/%m/%Y') if pd.notnull(x) and str(x).strip() != '' else "Ativo"
+            )
+            
+            df_view.columns = ["Servidor", "Função", "Início", "Término"]
+            
+            # Ordenação: Ativos primeiro, depois por data de início mais recente
+            st.dataframe(
+                df_view.sort_values(by=["Término", "Início"], ascending=[True, False]), 
+                use_container_width=True, 
+                hide_index=True
+            )
 
 
 # ============================================================
