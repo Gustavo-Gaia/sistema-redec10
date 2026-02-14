@@ -240,7 +240,7 @@ def cadastro_gestao(aba):
                     st.rerun()
 
 # ============================================================
-# 3. FUNÇÕES & SUBSTITUIÇÕES (COM HISTÓRICO DE COMANDO)
+# 3. FUNÇÕES & SUBSTITUIÇÕES (ORDEM: ATUAL -> ANTIGO)
 # ============================================================
 
 def funcoes_substituicoes(aba):
@@ -255,7 +255,7 @@ def funcoes_substituicoes(aba):
             st.warning("Nenhum servidor cadastrado no sistema.")
             return
 
-        # FILTRO: Apenas membros ativos para novas nomeações
+        # 1. Formulário de Registro (Membros Ativos)
         ativos = [m for m in equipe if m.get("ativo") == True]
         
         if not ativos:
@@ -263,14 +263,13 @@ def funcoes_substituicoes(aba):
         else:
             nomes_id = {f"{m['posto_graduacao']} {m['nome']}": m["id"] for m in ativos}
             
-            # Formuário de Registro
             col_f1, col_f2, col_f3 = st.columns([1, 1, 0.8])
             with col_f1:
                 funcao = st.selectbox("Função", ["Coordenador", "Subcoordenador", "Oficial Administrativo", "Praça Administrativo"])
             with col_f2:
                 pessoa_label = st.selectbox("Servidor Ativo", list(nomes_id.keys()))
             with col_f3:
-                data = st.date_input("Data de início", help="No caso de Coordenador, esta será a data de saída do anterior.")
+                data = st.date_input("Data de início")
 
             if st.button("Confirmar Alteração de Função", use_container_width=True, type="primary"):
                 trocar_funcao(nomes_id[pessoa_label], funcao, data)
@@ -280,41 +279,44 @@ def funcoes_substituicoes(aba):
         st.divider()
 
         # ============================================================
-        # SEÇÃO ESPECÍFICA: LINHA DO TEMPO DOS COORDENADORES
+        # 🏛️ GALERIA DE COORDENADORES (ORDEM DECRESCENTE)
         # ============================================================
-        st.markdown("### 🏛️ Galeria de Coordenadores (Histórico de Comando)")
+        st.markdown("### 🏛️ Histórico de Coordenadores (Do Atual para o Antigo)")
         
         if historico_raw:
             df_hist = pd.DataFrame(historico_raw)
             
-            # Filtrar apenas Coordenadores
+            # Filtra apenas Coordenadores
             df_coord = df_hist[df_hist["funcao"] == "Coordenador"].copy()
             
             if not df_coord.empty:
-                # Extrair Posto e Nome do dicionário 'equipe'
+                # Extrair Posto e Nome
                 df_coord["Coordenador"] = df_coord["equipe"].apply(
                     lambda x: f"{x.get('posto_graduacao', '')} {x.get('nome', '')}".strip() if isinstance(x, dict) else "Desconhecido"
                 )
                 
-                # Converter e formatar datas
-                df_coord["data_entrada"] = pd.to_datetime(df_coord["data_entrada"])
-                df_coord["Início do Mandato"] = df_coord["data_entrada"].dt.strftime('%d/%m/%Y')
+                # Garantir que data_entrada seja datetime para ordenação precisa
+                df_coord["dt_entrada_sort"] = pd.to_datetime(df_coord["data_entrada"])
                 
-                # Tratar data de saída (Término)
+                # Criar as colunas de exibição formatadas
+                df_coord["Início do Mandato"] = df_coord["dt_entrada_sort"].dt.strftime('%d/%m/%Y')
+                
                 df_coord["Término"] = df_coord["data_saida"].apply(
                     lambda x: pd.to_datetime(x).strftime('%d/%m/%Y') if pd.notnull(x) and str(x).strip() != '' else "🚩 ATUAL"
                 )
                 
-                # Selecionar e ordenar (Mais recente primeiro)
-                df_exibicao = df_coord[["Coordenador", "Início do Mandato", "Término"]]
+                # Selecionar colunas finais
+                df_exibicao = df_coord[["Coordenador", "Início do Mandato", "Término", "dt_entrada_sort"]]
                 
-                # Estilização visual para destacar o atual
-                def destacar_atual(val):
-                    color = 'background-color: rgba(28, 131, 225, 0.1)' if val == "🚩 ATUAL" else ''
-                    return color
+                # ORDENAÇÃO: dt_entrada_sort em ordem decrescente (True para ascendente, False para decrescente)
+                # O Atual (data mais recente) aparecerá no topo.
+                df_exibicao = df_exibicao.sort_values(by="dt_entrada_sort", ascending=False)
+
+                # Removemos a coluna auxiliar de ordenação antes de mostrar ao usuário
+                df_final = df_exibicao.drop(columns=["dt_entrada_sort"])
 
                 st.dataframe(
-                    df_exibicao.sort_values(by="Início do Mandato", ascending=False),
+                    df_final,
                     use_container_width=True,
                     hide_index=True
                 )
