@@ -117,12 +117,36 @@ def painel_equipe(aba):
         col1, col2, col3, col4 = st.columns(4)
 
         def card(titulo, nomes):
-            conteudo = "<br>".join(nomes) if nomes else "<span style='opacity:0.6'>Vago</span>"
+            # Tratamento para nomes longos: reduz fonte se houver muitos nomes ou nomes grandes
+            estilo_fonte = "12px" if len(nomes) <= 2 else "11px"
+            
+            conteudo = ""
+            if nomes:
+                for n in nomes:
+                    conteudo += f'<div style="margin-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 2px;">{n}</div>'
+            else:
+                conteudo = "<span style='opacity:0.6 italic'>Vago</span>"
+        
             st.markdown(f"""
-            <div style="background: linear-gradient(135deg, #163c66, #1f5aa6); padding:18px; border-radius:14px; color:white; text-align:center; min-height:130px; box-shadow:0 6px 12px rgba(0,0,0,.18); display:flex; flex-direction:column; justify-content:center;">
-                <div style="font-size:11px; opacity:.8; margin-bottom:8px; font-weight:bold; letter-spacing:1px;">{titulo.upper()}</div>
-                <div style="font-size:13px; font-weight:600; line-height:1.4;">{conteudo}</div>
-            </div>""", unsafe_allow_html=True)
+            <div style="
+                background: linear-gradient(135deg, #163c66, #1f5aa6);
+                padding: 15px;
+                border-radius: 10px;
+                color: white;
+                text-align: center;
+                min-height: 150px;
+                display: flex;
+                flex-direction: column;
+                box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+                border: 1px solid rgba(255,255,255,0.1);">
+                <div style="font-size: 10px; text-transform: uppercase; opacity: 0.7; font-weight: 700; margin-bottom: 12px; letter-spacing: 0.5px; border-bottom: 1px solid rgba(255,255,255,0.3); padding-bottom: 5px;">
+                    {titulo}
+                </div>
+                <div style="font-size: {estilo_fonte}; font-weight: 500; line-height: 1.2; flex-grow: 1; display: flex; flex-direction: column; justify-content: center;">
+                    {conteudo}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
         with col1: card("Coordenador", cargos_cards["Coordenador"])
         with col2: card("Subcoordenador", cargos_cards["Subcoordenador"])
@@ -306,19 +330,26 @@ def relatorios(aba):
     with aba:
         st.markdown("### 📊 Relatórios Gerenciais")
 
-        equipe = buscar_equipe()
-        if not equipe:
+        # 1. Busca dados atualizados
+        equipe_raw = buscar_equipe()
+        historico_raw = buscar_historico()
+        
+        if not equipe_raw:
             st.info("Nenhum dado disponível.")
             return
 
-        df = pd.DataFrame(equipe)
-        ativos = df[df["ativo"] == True]
+        df_equipe = pd.DataFrame(equipe_raw)
+        df_hist = pd.DataFrame(historico_raw)
+
+        # 2. Filtra quem está REALMENTE em uma função agora (data_saida é nulo)
+        ocupantes_atuais = df_hist[df_hist["data_saida"].isna()]["equipe_id"].unique()
+        total_real_ativo = len(ocupantes_atuais)
 
         col1, col2, col3 = st.columns(3)
-        col1.metric("Total Cadastrado", len(df))
-        col2.metric("Efetivo Ativo", len(ativos))
-        col3.metric("Afastados (Férias/Lic)", "Ver Painel")
-
+        col1.metric("Total Cadastrado", len(df_equipe))
+        col2.metric("Efetivo em Função", total_real_ativo)
+        col3.metric("Membros Ativos (DB)", len(df_equipe[df_equipe["ativo"] == True]))
+        
         st.divider()
         st.markdown("### 🖨 Exportar Dados")
         st.download_button(
