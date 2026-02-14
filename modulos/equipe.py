@@ -69,17 +69,18 @@ def painel_equipe(aba):
             st.info("Nenhuma função registrada.")
             return
 
-        # 1. Criar DataFrame e filtrar ocupantes atuais (data_saida nulo)
+        # 1. Criar DataFrame e filtrar ocupantes atuais
         df_raw = pd.DataFrame(historico)
         df = df_raw[df_raw["data_saida"].isna()].copy()
 
-        # 2. Extração Robusta: Garante que os dados do dicionário 'equipe' virem colunas
+        # 2. Extração Robusta dos dados da Equipe (JOIN do Supabase)
         def extrair_campo(row, campo):
             eq = row.get("equipe", {})
             if isinstance(eq, dict):
                 return str(eq.get(campo, "")).strip().upper()
             return ""
 
+        # Criamos colunas explícitas para evitar erros de renderização
         df["nome_c"] = df.apply(lambda x: extrair_campo(x, "nome"), axis=1)
         df["posto_c"] = df.apply(lambda x: extrair_campo(x, "posto_graduacao"), axis=1)
 
@@ -89,7 +90,7 @@ def painel_equipe(aba):
 
         df["posto_ord"] = df["posto_c"].apply(normalize)
 
-        # 4. Organização por cargos
+        # 4. Organização por cargos para os Cards
         cargos_cards = {
             "Coordenador": [],
             "Subcoordenador": [],
@@ -98,48 +99,30 @@ def painel_equipe(aba):
         }
 
         for funcao in cargos_cards.keys():
-            # Filtrar membros da função específica
-            membros_funcao = df[df["funcao"] == funcao].copy()
+            sub = df[df["funcao"] == funcao].copy()
 
-            if not membros_funcao.empty:
+            if not sub.empty:
                 # Aplicar peso da hierarquia
-                membros_funcao["peso"] = membros_funcao["posto_ord"].apply(lambda x: HIERARQUIA_MILITAR.get(x, 99))
-                
-                # Ordenar
-                membros_funcao = membros_funcao.sort_values(by=["peso", "nome_c"])
+                sub["peso"] = sub["posto_ord"].apply(lambda x: HIERARQUIA_MILITAR.get(x, 99))
+                # Ordenar por Hierarquia e depois Nome
+                sub = sub.sort_values(by=["peso", "nome_c"])
 
-                # Criar a string de exibição: "POSTO NOME"
-                # Usamos explicitamente as colunas extraídas 'posto_c' e 'nome_c'
+                # MONTAGEM DA STRING FINAL: "POSTO NOME"
                 cargos_cards[funcao] = [
                     f"{row['posto_c']} {row['nome_c']}".strip() 
-                    for _, row in membros_funcao.iterrows()
+                    for _, row in sub.iterrows()
                 ]
 
-        # 5. Renderização dos Cards (mantendo sua estrutura original)
+        # 5. Renderização dos Cards
         col1, col2, col3, col4 = st.columns(4)
 
         def card(titulo, nomes):
             conteudo = "<br>".join(nomes) if nomes else "<span style='opacity:0.6'>Vago</span>"
             st.markdown(f"""
-            <div style="
-                background: linear-gradient(135deg, #163c66, #1f5aa6);
-                padding:18px;
-                border-radius:14px;
-                color:white;
-                text-align:center;
-                min-height:130px;
-                box-shadow:0 6px 12px rgba(0,0,0,.18);
-                display:flex;
-                flex-direction:column;
-                justify-content:center;">
-                <div style="font-size:11px; opacity:.8; margin-bottom:8px; font-weight:bold; letter-spacing:1px;">
-                    {titulo.upper()}
-                </div>
-                <div style="font-size:13px; font-weight:600; line-height:1.4;">
-                    {conteudo}
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
+            <div style="background: linear-gradient(135deg, #163c66, #1f5aa6); padding:18px; border-radius:14px; color:white; text-align:center; min-height:130px; box-shadow:0 6px 12px rgba(0,0,0,.18); display:flex; flex-direction:column; justify-content:center;">
+                <div style="font-size:11px; opacity:.8; margin-bottom:8px; font-weight:bold; letter-spacing:1px;">{titulo.upper()}</div>
+                <div style="font-size:13px; font-weight:600; line-height:1.4;">{conteudo}</div>
+            </div>""", unsafe_allow_html=True)
 
         with col1: card("Coordenador", cargos_cards["Coordenador"])
         with col2: card("Subcoordenador", cargos_cards["Subcoordenador"])
@@ -147,13 +130,15 @@ def painel_equipe(aba):
         with col4: card("Praça Administrativo", cargos_cards["Praça Administrativo"])
 
         st.divider()
-        # Exibição do histórico simplificado abaixo
+        
+        # 6. Histórico Funcional corrigido
         st.subheader("📜 Histórico Funcional")
         if not df_raw.empty:
-             # Reutiliza a lógica de extração para o histórico
-             df_raw["Militar"] = df_raw["equipe"].apply(lambda x: f"{x.get('posto_graduacao', '')} {x.get('nome', '')}" if isinstance(x, dict) else "Desconhecido")
+             df_raw["Militar"] = df_raw["equipe"].apply(
+                 lambda x: f"{x.get('posto_graduacao', '')} {x.get('nome', '')}".strip() if isinstance(x, dict) else "Desconhecido"
+             )
              df_hist = df_raw[["Militar", "funcao", "data_entrada", "data_saida"]].copy()
-             df_hist.columns = ["Militar", "Função", "Início", "Término"]
+             df_hist.columns = ["Servidor (Posto + Nome)", "Função", "Início", "Término"]
              st.dataframe(df_hist.sort_values("Início", ascending=False), use_container_width=True, hide_index=True)
 
 
@@ -195,17 +180,20 @@ def cadastro_gestao(aba):
         equipe = buscar_equipe()
         if equipe:
             df_lista = pd.DataFrame(equipe)
-            # Ordenar a lista geral também por hierarquia para facilitar a busca
+            # Ordenar por hierarquia
             df_lista["peso"] = df_lista["posto_graduacao"].apply(lambda x: HIERARQUIA_MILITAR.get(x, 99))
             df_lista = df_lista.sort_values(by=["peso", "nome"])
             
-            st.dataframe(df_lista[["id", "posto_graduacao", "nome", "quadro_qbmp", "telefone"]], 
+            # Exibir com posto antes do nome na tabela
+            st.dataframe(df_lista[["posto_graduacao", "nome", "quadro_qbmp", "telefone"]], 
                          use_container_width=True, hide_index=True)
 
             st.divider()
             st.markdown("### ✏️ Editar / Excluir")
-            selecionado = st.selectbox("Selecione para editar", df_lista["nome"].tolist())
-            registro = df_lista[df_lista["nome"] == selecionado].iloc[0]
+            # Label do selectbox agora inclui o posto para clareza
+            opcoes_edicao = {f"{r['posto_graduacao']} {r['nome']}": r for _, r in df_lista.iterrows()}
+            selecionado_label = st.selectbox("Selecione para editar", list(opcoes_edicao.keys()))
+            registro = opcoes_edicao[selecionado_label]
 
             with st.expander(f"Editar dados de {registro['nome']}"):
                 col1, col2 = st.columns(2)
@@ -245,6 +233,7 @@ def funcoes_substituicoes(aba):
             st.warning("Cadastre servidores primeiro.")
             return
 
+        # Dicionário garantindo Posto + Nome no seletor
         nomes_id = {f"{m['posto_graduacao']} {m['nome']}": m["id"] for m in equipe}
 
         funcao = st.selectbox("Função", [
@@ -304,6 +293,7 @@ def ferias_licencas(aba):
         st.markdown("### 📅 Registros Recentes")
         registros = buscar_ferias()
         if registros:
+            # Melhorar visualização da tabela de férias com nomes legíveis
             df_ferias = pd.DataFrame(registros)
             st.dataframe(df_ferias, use_container_width=True, hide_index=True)
 
@@ -327,7 +317,7 @@ def relatorios(aba):
         col1, col2, col3 = st.columns(3)
         col1.metric("Total Cadastrado", len(df))
         col2.metric("Efetivo Ativo", len(ativos))
-        col3.metric("Afastados (Férias/Lic)", "Ver Painel") # Logica futura para cruzamento
+        col3.metric("Afastados (Férias/Lic)", "Ver Painel")
 
         st.divider()
         st.markdown("### 🖨 Exportar Dados")
