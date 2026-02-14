@@ -240,34 +240,88 @@ def cadastro_gestao(aba):
                     st.rerun()
 
 # ============================================================
-# 3. FUNÇÕES & SUBSTITUIÇÕES
+# 3. FUNÇÕES & SUBSTITUIÇÕES (COM HISTÓRICO DE COMANDO)
 # ============================================================
 
 def funcoes_substituicoes(aba):
     with aba:
         st.markdown("### 🔁 Registro de Funções")
+        
+        # Busca dados atualizados
         equipe = buscar_equipe()
-        if not equipe: return
+        historico_raw = buscar_historico()
+        
+        if not equipe:
+            st.warning("Nenhum servidor cadastrado no sistema.")
+            return
 
+        # FILTRO: Apenas membros ativos para novas nomeações
         ativos = [m for m in equipe if m.get("ativo") == True]
         
         if not ativos:
-            st.warning("Nenhum servidor ATIVO encontrado.")
-            return
+            st.warning("Nenhum servidor ATIVO encontrado para novas funções.")
+        else:
+            nomes_id = {f"{m['posto_graduacao']} {m['nome']}": m["id"] for m in ativos}
+            
+            # Formuário de Registro
+            col_f1, col_f2, col_f3 = st.columns([1, 1, 0.8])
+            with col_f1:
+                funcao = st.selectbox("Função", ["Coordenador", "Subcoordenador", "Oficial Administrativo", "Praça Administrativo"])
+            with col_f2:
+                pessoa_label = st.selectbox("Servidor Ativo", list(nomes_id.keys()))
+            with col_f3:
+                data = st.date_input("Data de início", help="No caso de Coordenador, esta será a data de saída do anterior.")
 
-        nomes_id = {f"{m['posto_graduacao']} {m['nome']}": m["id"] for m in ativos}
+            if st.button("Confirmar Alteração de Função", use_container_width=True, type="primary"):
+                trocar_funcao(nomes_id[pessoa_label], funcao, data)
+                st.success(f"Registro de {funcao} atualizado!")
+                st.rerun()
 
-        funcao = st.selectbox("Função", ["Coordenador", "Subcoordenador", "Oficial Administrativo", "Praça Administrativo"])
-        pessoa_label = st.selectbox("Servidor Ativo", list(nomes_id.keys()))
-        data = st.date_input("Data de início (Novo ocupante)")
+        st.divider()
 
-        st.info("💡 Para Coordenadores e Subcoordenadores, o ocupante anterior será encerrado automaticamente na data selecionada acima.")
+        # ============================================================
+        # SEÇÃO ESPECÍFICA: LINHA DO TEMPO DOS COORDENADORES
+        # ============================================================
+        st.markdown("### 🏛️ Galeria de Coordenadores (Histórico de Comando)")
+        
+        if historico_raw:
+            df_hist = pd.DataFrame(historico_raw)
+            
+            # Filtrar apenas Coordenadores
+            df_coord = df_hist[df_hist["funcao"] == "Coordenador"].copy()
+            
+            if not df_coord.empty:
+                # Extrair Posto e Nome do dicionário 'equipe'
+                df_coord["Coordenador"] = df_coord["equipe"].apply(
+                    lambda x: f"{x.get('posto_graduacao', '')} {x.get('nome', '')}".strip() if isinstance(x, dict) else "Desconhecido"
+                )
+                
+                # Converter e formatar datas
+                df_coord["data_entrada"] = pd.to_datetime(df_coord["data_entrada"])
+                df_coord["Início do Mandato"] = df_coord["data_entrada"].dt.strftime('%d/%m/%Y')
+                
+                # Tratar data de saída (Término)
+                df_coord["Término"] = df_coord["data_saida"].apply(
+                    lambda x: pd.to_datetime(x).strftime('%d/%m/%Y') if pd.notnull(x) and str(x).strip() != '' else "🚩 ATUAL"
+                )
+                
+                # Selecionar e ordenar (Mais recente primeiro)
+                df_exibicao = df_coord[["Coordenador", "Início do Mandato", "Término"]]
+                
+                # Estilização visual para destacar o atual
+                def destacar_atual(val):
+                    color = 'background-color: rgba(28, 131, 225, 0.1)' if val == "🚩 ATUAL" else ''
+                    return color
 
-        if st.button("Registrar Função"):
-            trocar_funcao(nomes_id[pessoa_label], funcao, data)
-            st.success(f"Função {funcao} registrada com sucesso!")
-            st.rerun()
-
+                st.dataframe(
+                    df_exibicao.sort_values(by="Início do Mandato", ascending=False),
+                    use_container_width=True,
+                    hide_index=True
+                )
+            else:
+                st.info("Nenhum histórico de Coordenador encontrado.")
+        else:
+            st.info("O histórico está vazio.")
 
 # ============================================================
 # 4. FÉRIAS / LICENÇAS
