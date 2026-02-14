@@ -281,7 +281,7 @@ def funcoes_substituicoes(aba):
         # ============================================================
         # 🏛️ GALERIA DE COORDENADORES (ORDEM DECRESCENTE)
         # ============================================================
-        st.markdown("### 🏛️ Histórico de Coordenadores (Do Atual para o Antigo)")
+        st.markdown("### 🏛️ Histórico de Coordenadores")
         
         if historico_raw:
             df_hist = pd.DataFrame(historico_raw)
