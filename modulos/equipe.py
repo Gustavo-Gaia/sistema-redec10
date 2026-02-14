@@ -1,5 +1,3 @@
-# modulos/equipe.py
-
 import streamlit as st
 import pandas as pd
 import re
@@ -70,7 +68,9 @@ def painel_equipe(aba):
             return
 
         df_raw = pd.DataFrame(historico_data)
-        df_atual = df_raw[df_raw["data_saida"].isna()].copy()
+        
+        # FILTRO ROBUSTO: data_saida deve ser nulo ou vazio para ser considerado ATUAL
+        df_atual = df_raw[df_raw["data_saida"].apply(lambda x: x is None or str(x).lower() == 'none' or str(x).strip() == '')].copy()
 
         def extrair_campo(row, campo):
             eq = row.get("equipe", {})
@@ -82,7 +82,7 @@ def painel_equipe(aba):
         df_atual["posto_c"] = df_atual.apply(lambda x: extrair_campo(x, "posto_graduacao"), axis=1)
 
         def normalize(t):
-            return re.sub(r"\s+", " ", t.replace("\u00a0", " ")).strip()
+            return re.sub(r"\s+", " ", str(t).replace("\u00a0", " ")).strip()
 
         df_atual["posto_ord"] = df_atual["posto_c"].apply(normalize)
 
@@ -133,12 +133,16 @@ def painel_equipe(aba):
         if not df_raw.empty:
              df_raw["Militar"] = df_raw["equipe"].apply(lambda x: f"{x.get('posto_graduacao', '')} {x.get('nome', '')}".strip() if isinstance(x, dict) else "Desconhecido")
              df_hist_view = df_raw[["Militar", "funcao", "data_entrada", "data_saida"]].copy()
+             
+             # Melhorando visualização do histórico
+             df_hist_view["data_saida"] = df_hist_view["data_saida"].fillna("Ativo")
              df_hist_view.columns = ["Servidor (Posto + Nome)", "Função", "Início", "Término"]
+             
              st.dataframe(df_hist_view.sort_values("Início", ascending=False), use_container_width=True, hide_index=True)
 
 
 # ============================================================
-# 2. CADASTRO & GESTÃO (COM OPÇÃO DE DESATIVAR)
+# 2. CADASTRO & GESTÃO
 # ============================================================
 
 def cadastro_gestao(aba):
@@ -176,7 +180,6 @@ def cadastro_gestao(aba):
 
             st.divider()
             st.markdown("### ✏️ Editar / Desativar Servidor")
-            # Label agora indica se está Ativo/Inativo para facilitar a gestão
             opcoes_edicao = {f"{r['posto_graduacao']} {r['nome']} ({'ATIVO' if r['ativo'] else 'INATIVO'})": r for _, r in df_lista.iterrows()}
             selecionado_label = st.selectbox("Selecione para editar", list(opcoes_edicao.keys()))
             registro = opcoes_edicao[selecionado_label]
@@ -191,7 +194,6 @@ def cadastro_gestao(aba):
                     quadro_edit = st.text_input("Quadro", registro["quadro_qbmp"])
                     tel_edit = st.text_input("Telefone", registro["telefone"])
                 
-                # Checkbox para desativar o membro sem excluí-lo
                 ativo_edit = st.checkbox("Membro Ativo (Aparece em seleções)", value=bool(registro["ativo"]))
 
                 c1, c2 = st.columns(2)
@@ -209,7 +211,7 @@ def cadastro_gestao(aba):
                     st.rerun()
 
 # ============================================================
-# 3. FUNÇÕES & SUBSTITUIÇÕES (APENAS ATIVOS)
+# 3. FUNÇÕES & SUBSTITUIÇÕES
 # ============================================================
 
 def funcoes_substituicoes(aba):
@@ -218,7 +220,6 @@ def funcoes_substituicoes(aba):
         equipe = buscar_equipe()
         if not equipe: return
 
-        # FILTRO: Apenas membros com 'ativo' == True
         ativos = [m for m in equipe if m.get("ativo") == True]
         
         if not ativos:
@@ -229,16 +230,18 @@ def funcoes_substituicoes(aba):
 
         funcao = st.selectbox("Função", ["Coordenador", "Subcoordenador", "Oficial Administrativo", "Praça Administrativo"])
         pessoa_label = st.selectbox("Servidor Ativo", list(nomes_id.keys()))
-        data = st.date_input("Data de início")
+        data = st.date_input("Data de início (Novo ocupante)")
+
+        st.info("💡 Para Coordenadores e Subcoordenadores, o ocupante anterior será encerrado automaticamente na data selecionada acima.")
 
         if st.button("Registrar Função"):
             trocar_funcao(nomes_id[pessoa_label], funcao, data)
-            st.success(f"Função {funcao} registrada!")
+            st.success(f"Função {funcao} registrada com sucesso!")
             st.rerun()
 
 
 # ============================================================
-# 4. FÉRIAS / LICENÇAS (APENAS ATIVOS)
+# 4. FÉRIAS / LICENÇAS
 # ============================================================
 
 def ferias_licencas(aba):
@@ -247,7 +250,6 @@ def ferias_licencas(aba):
         equipe = buscar_equipe()
         if not equipe: return
 
-        # FILTRO: Apenas membros com 'ativo' == True
         ativos = [m for m in equipe if m.get("ativo") == True]
         
         if not ativos:
@@ -290,6 +292,7 @@ def relatorios(aba):
         df_equipe = pd.DataFrame(equipe_raw)
         df_hist = pd.DataFrame(historico_raw)
 
+        # Ocupantes atuais seguindo a mesma lógica do painel
         ocupantes_atuais = df_hist[df_hist["data_saida"].isna()]["equipe_id"].nunique()
 
         col1, col2, col3 = st.columns(3)
