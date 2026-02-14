@@ -69,33 +69,27 @@ def painel_equipe(aba):
             st.info("Nenhuma função registrada.")
             return
 
-        # Converter para DataFrame e filtrar apenas ocupantes atuais
-        df = pd.DataFrame(historico)
-        df = df[df["data_saida"].isna()].copy()
+        # 1. Criar DataFrame e filtrar ocupantes atuais (data_saida nulo)
+        df_raw = pd.DataFrame(historico)
+        df = df_raw[df_raw["data_saida"].isna()].copy()
 
-        # Função interna para limpar e extrair dados do JSON do Supabase
-        def extrair_dados(row):
+        # 2. Extração Robusta: Garante que os dados do dicionário 'equipe' virem colunas
+        def extrair_campo(row, campo):
             eq = row.get("equipe", {})
-            if not isinstance(eq, dict):
-                return "", ""
-            
-            nome = str(eq.get("nome", "")).strip().upper()
-            posto = str(eq.get("posto_graduacao", "")).strip().upper()
-            return nome, posto
+            if isinstance(eq, dict):
+                return str(eq.get(campo, "")).strip().upper()
+            return ""
 
-        # Aplicar extração
-        df[["nome_completo", "posto_graduacao"]] = df.apply(
-            lambda x: pd.Series(extrair_dados(x)), axis=1
-        )
+        df["nome_c"] = df.apply(lambda x: extrair_campo(x, "nome"), axis=1)
+        df["posto_c"] = df.apply(lambda x: extrair_campo(x, "posto_graduacao"), axis=1)
 
-        # Normalização do Posto para ordenação (remove caracteres especiais de espaço)
-        def limpar_texto(t):
-            t = t.replace("\u00a0", " ")
-            return re.sub(r"\s+", " ", t).strip()
+        # 3. Normalização para ordenação
+        def normalize(t):
+            return re.sub(r"\s+", " ", t.replace("\u00a0", " ")).strip()
 
-        df["posto_limpo"] = df["posto_graduacao"].apply(limpar_texto)
+        df["posto_ord"] = df["posto_c"].apply(normalize)
 
-        # Dicionário para armazenar quem vai em cada card
+        # 4. Organização por cargos
         cargos_cards = {
             "Coordenador": [],
             "Subcoordenador": [],
@@ -104,27 +98,24 @@ def painel_equipe(aba):
         }
 
         for funcao in cargos_cards.keys():
-            sub = df[df["funcao"] == funcao].copy()
+            # Filtrar membros da função específica
+            membros_funcao = df[df["funcao"] == funcao].copy()
 
-            if sub.empty:
-                continue
+            if not membros_funcao.empty:
+                # Aplicar peso da hierarquia
+                membros_funcao["peso"] = membros_funcao["posto_ord"].apply(lambda x: HIERARQUIA_MILITAR.get(x, 99))
+                
+                # Ordenar
+                membros_funcao = membros_funcao.sort_values(by=["peso", "nome_c"])
 
-            # Criar coluna de peso para ordenação
-            sub["peso"] = sub["posto_limpo"].apply(lambda x: HIERARQUIA_MILITAR.get(x, 99))
-            
-            # Ordenar por Hierarquia (peso) e depois por Nome
-            sub = sub.sort_values(by=["peso", "nome_completo"])
+                # Criar a string de exibição: "POSTO NOME"
+                # Usamos explicitamente as colunas extraídas 'posto_c' e 'nome_c'
+                cargos_cards[funcao] = [
+                    f"{row['posto_c']} {row['nome_c']}".strip() 
+                    for _, row in membros_funcao.iterrows()
+                ]
 
-            # AQUI ESTÁ A CORREÇÃO: Montar a string "POSTO NOME" explicitamente
-            lista_final = []
-            for _, row in sub.iterrows():
-                # Garante que o posto apareça antes do nome
-                texto_membro = f"{row['posto_graduacao']} {row['nome_completo']}".strip()
-                lista_final.append(texto_membro)
-
-            cargos_cards[funcao] = lista_final
-
-        # Renderização dos Cards
+        # 5. Renderização dos Cards (mantendo sua estrutura original)
         col1, col2, col3, col4 = st.columns(4)
 
         def card(titulo, nomes):
@@ -156,14 +147,14 @@ def painel_equipe(aba):
         with col4: card("Praça Administrativo", cargos_cards["Praça Administrativo"])
 
         st.divider()
+        # Exibição do histórico simplificado abaixo
         st.subheader("📜 Histórico Funcional")
-        
-        dfh = pd.DataFrame(historico)
-        if not dfh.empty:
-            dfh["Servidor"] = dfh["equipe"].apply(lambda x: f"{x.get('posto_graduacao')} {x.get('nome')}" if isinstance(x, dict) else "")
-            dfh = dfh[["Servidor", "funcao", "data_entrada", "data_saida"]]
-            dfh.columns = ["Servidor (Posto + Nome)", "Função", "Início", "Término"]
-            st.dataframe(dfh.sort_values("Início", ascending=False), use_container_width=True, hide_index=True)
+        if not df_raw.empty:
+             # Reutiliza a lógica de extração para o histórico
+             df_raw["Militar"] = df_raw["equipe"].apply(lambda x: f"{x.get('posto_graduacao', '')} {x.get('nome', '')}" if isinstance(x, dict) else "Desconhecido")
+             df_hist = df_raw[["Militar", "funcao", "data_entrada", "data_saida"]].copy()
+             df_hist.columns = ["Militar", "Função", "Início", "Término"]
+             st.dataframe(df_hist.sort_values("Início", ascending=False), use_container_width=True, hide_index=True)
 
 
 # ============================================================
